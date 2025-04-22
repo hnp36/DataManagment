@@ -107,64 +107,294 @@
       </div>
 
       <!-- In-Patient Management -->
-      <div class="tab-pane fade" id="inpatient">
-        <h3>In-Patient Management</h3>
-        <div class="mb-3">
-            <button type="button" class="btn btn-outline-success">Assign Room</button>
+      <!-- Replace the entire In-Patient Management tab content with this: -->
+<div class="tab-pane fade" id="inpatient">
+  <h3>In-Patient Management</h3>
+  
+  <!-- Room Management -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5>Room Management</h5>
+    </div>
+    <div class="card-body">
+      <div class="row mb-3">
+        <div class="col-md-6">
+          <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addRoomModal">Add New Room</button>
         </div>
-        <div class="mb-3">
-          <h5>Available Rooms</h5>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Type</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="3" class="text-center">No rooms available</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <div class="mb-3">
-            <h5>Book a Surgery</h5>
-            <form id="bookSurgeryForm">
-              <div class="mb-2">
-                <input type="text" class="form-control" name="patient_id" placeholder="Patient ID" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="surgeon" placeholder="Surgeon Name" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="room" placeholder="Room No." required />
-              </div>
-              <div class="mb-2">
-                <input type="date" class="form-control" name="date" required />
-              </div>
-              <button type="button" class="btn btn-outline-success">Book Surgery</button>
-
-            </form>
-            
-            <div id="surgerySuccessMsg" class="mt-3 text-success d-none">
-              Surgery successfully booked!
-            </div>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Surgeon</th>
-                <th>Room</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center">No surgeries scheduled</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-6">
+          <select class="form-control" id="roomStatusFilter">
+            <option value="">All Rooms</option>
+            <option value="Available">Available</option>
+            <option value="Occupied">Occupied</option>
+            <option value="Maintenance">Maintenance</option>
+          </select>
         </div>
       </div>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Room Number</th>
+            <th>Type</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="roomsTableBody">
+          <tr><td colspan="4" class="text-center">Loading rooms...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
 
+  <!-- Patient Room Assignment -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5>Patient Room Assignment</h5>
+    </div>
+    <div class="card-body">
+      <form id="assignRoomForm">
+        <div class="row g-2">
+          <div class="col-md-3">
+            <select class="form-control" name="patient_id" id="assignPatientSelect" required>
+              <option value="">Select Patient</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-control" name="room_number" id="availableRoomsSelect" required>
+              <option value="">Select Available Room</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <input type="date" class="form-control" name="admission_date" required />
+          </div>
+          <div class="col-md-2">
+            <input type="date" class="form-control" name="discharge_date" />
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">Assign</button>
+          </div>
+        </div>
+      </form>
+      <div id="assignRoomSuccess" class="mt-2 text-success d-none">Room assigned successfully!</div>
+      <div id="assignRoomError" class="mt-2 text-danger d-none"></div>
+      
+      <h6 class="mt-4">Current Assignments</h6>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Room</th>
+            <th>Admission Date</th>
+            <th>Discharge Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="roomAssignmentsTable">
+          <tr><td colspan="5" class="text-center">Loading assignments...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Staff Assignment -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5>Staff Assignment</h5>
+    </div>
+    <div class="card-body">
+      <form id="assignStaffForm">
+        <div class="row g-2">
+          <div class="col-md-3">
+            <select class="form-control" name="patient_id" id="staffPatientSelect" required>
+              <option value="">Select Patient</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-control" name="staff_type" id="staffTypeSelect" required>
+              <option value="">Select Staff Type</option>
+              <option value="doctor">Doctor</option>
+              <option value="nurse">Nurse</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-control" name="staff_id" id="staffSelect" required disabled>
+              <option value="">Select Staff Member</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <button type="submit" class="btn btn-success w-100">Assign</button>
+          </div>
+        </div>
+      </form>
+      <div id="assignStaffSuccess" class="mt-2 text-success d-none">Staff assigned successfully!</div>
+      <div id="assignStaffError" class="mt-2 text-danger d-none"></div>
+      
+      <h6 class="mt-4">Current Assignments</h6>
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Staff</th>
+            <th>Role</th>
+            <th>Assigned Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="staffAssignmentsTable">
+          <tr><td colspan="5" class="text-center">Loading assignments...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Surgery Management -->
+  <div class="card mb-4">
+    <div class="card-header">
+      <h5>Surgery Management</h5>
+    </div>
+    <div class="card-body">
+      <form id="bookSurgeryForm">
+        <div class="row g-2 mb-3">
+          <div class="col-md-3">
+            <select class="form-control" name="patient_id" id="surgeryPatientSelect" required>
+              <option value="">Select Patient</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <select class="form-control" name="surgeon_id" id="surgeonSelect" required>
+              <option value="">Select Surgeon</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <select class="form-control" name="room_number" id="surgeryRoomSelect" required>
+              <option value="">Select Room</option>
+            </select>
+          </div>
+          <div class="col-md-2">
+            <input type="date" class="form-control" name="surgery_date" required />
+          </div>
+          <div class="col-md-2">
+            <input type="time" class="form-control" name="surgery_time" required />
+          </div>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-10">
+            <input type="text" class="form-control" name="procedure" placeholder="Procedure Description" required />
+          </div>
+          <div class="col-md-2">
+            <button type="submit" class="btn btn-success w-100">Book Surgery</button>
+          </div>
+        </div>
+      </form>
+      <div id="surgerySuccessMsg" class="mt-2 text-success d-none">Surgery booked successfully!</div>
+      <div id="surgeryErrorMsg" class="mt-2 text-danger d-none"></div>
+      
+      <div class="row mt-4">
+        <div class="col-md-6">
+          <h6>View Surgeries By:</h6>
+          <div class="input-group mb-3">
+            <select class="form-control" id="surgeryFilterType">
+              <option value="date">Date</option>
+              <option value="room">Room</option>
+              <option value="surgeon">Surgeon</option>
+              <option value="patient">Patient</option>
+            </select>
+            <input type="text" class="form-control" id="surgeryFilterValue" placeholder="Filter value">
+            <button class="btn btn-primary" id="filterSurgeriesBtn">Filter</button>
+          </div>
+        </div>
+      </div>
+      
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Patient</th>
+            <th>Surgeon</th>
+            <th>Room</th>
+            <th>Date</th>
+            <th>Time</th>
+            <th>Procedure</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="surgeriesTableBody">
+          <tr><td colspan="7" class="text-center">No surgeries scheduled</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Add Room Modal -->
+<div class="modal fade" id="addRoomModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Add New Room</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="addRoomForm">
+          <div class="mb-3">
+            <input type="text" class="form-control" name="room_number" placeholder="Room Number" required />
+          </div>
+          <div class="mb-3">
+            <select class="form-control" name="room_type" required>
+              <option value="">Select Room Type</option>
+              <option value="General">General</option>
+              <option value="ICU">ICU</option>
+              <option value="Operating">Operating</option>
+              <option value="Private">Private</option>
+            </select>
+          </div>
+          <div class="mb-3">
+            <select class="form-control" name="status" required>
+              <option value="Available">Available</option>
+              <option value="Maintenance">Maintenance</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary">Add Room</button>
+        </form>
+        <div id="addRoomSuccess" class="mt-2 text-success d-none">Room added successfully!</div>
+        <div id="addRoomError" class="mt-2 text-danger d-none"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Discharge Patient Modal -->
+<div class="modal fade" id="dischargeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Discharge Patient</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to discharge this patient and free up the room?</p>
+        <input type="hidden" id="dischargePatientId">
+        <button type="button" class="btn btn-danger" id="confirmDischargeBtn">Confirm Discharge</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Remove Staff Assignment Modal -->
+<div class="modal fade" id="removeStaffModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Remove Staff Assignment</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p>Are you sure you want to remove this staff assignment?</p>
+        <input type="hidden" id="removeAssignmentId">
+        <button type="button" class="btn btn-danger" id="confirmRemoveStaffBtn">Confirm Removal</button>
+      </div>
+    </div>
+  </div>
+</div>
       <!-- clinic Staff Management -->
       <div class="tab-pane fade" id="staff">
         <h3>Clinic Staff Management</h3>
@@ -440,6 +670,353 @@
       populatePatientDropdowns();
       displayAppointments();
     });
+
+  // Room Management
+async function fetchRooms(status = '') {
+  try {
+    let url = 'http://localhost:8000/api/rooms';
+    if (status) {
+      url += `?status=${status}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    return data.rooms;
+  } catch (error) {
+    console.error('Error fetching rooms:', error);
+    throw error;
+  }
+}
+
+async function displayRooms(status = '') {
+  const tableBody = document.getElementById('roomsTableBody');
+  tableBody.innerHTML = '<tr><td colspan="4" class="text-center">Loading...</td></tr>';
+  
+  try {
+    const rooms = await fetchRooms(status);
+    
+    if (rooms.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="4" class="text-center">No rooms found</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    rooms.forEach(room => {
+      const row = `
+        <tr>
+          <td>${room.room_number}</td>
+          <td>${room.room_type}</td>
+          <td>
+            <span class="badge ${room.status === 'Available' ? 'bg-success' : 
+                              room.status === 'Occupied' ? 'bg-danger' : 'bg-warning'}">
+              ${room.status}
+            </span>
+          </td>
+          <td>
+            ${room.status === 'Occupied' ? 
+              '<button class="btn btn-sm btn-outline-secondary" disabled>Assign</button>' : 
+              '<button class="btn btn-sm btn-outline-primary assign-room-btn" data-room="${room.room_number}">Assign</button>'}
+          </td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+    
+    // Add event listeners to assign buttons
+    document.querySelectorAll('.assign-room-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const roomNumber = this.getAttribute('data-room');
+        document.getElementById('availableRoomsSelect').value = roomNumber;
+        document.getElementById('assignRoomForm').scrollIntoView();
+      });
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">Failed to load rooms</td></tr>';
+  }
+}
+
+// Room Status Filter
+document.getElementById('roomStatusFilter').addEventListener('change', function() {
+  displayRooms(this.value);
+});
+
+// Add Room Form
+document.getElementById('addRoomForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('addRoomSuccess');
+  const errorMsg = document.getElementById('addRoomError');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const roomData = {
+    room_number: formData.get('room_number'),
+    room_type: formData.get('room_type'),
+    status: formData.get('status')
+  };
+  
+  try {
+    const response = await fetch('http://localhost:8000/api/rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(roomData)
+    });
+    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const data = await response.json();
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    
+    // Refresh rooms list
+    await displayRooms();
+    await populateAvailableRooms();
+    
+    // Close modal
+    bootstrap.Modal.getInstance(document.getElementById('addRoomModal')).hide();
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+  }
+});
+
+// Patient Room Assignments
+async function fetchRoomAssignments() {
+  try {
+    const response = await fetch('http://localhost:8000/api/patient-rooms');
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    return data.assignments;
+  } catch (error) {
+    console.error('Error fetching room assignments:', error);
+    throw error;
+  }
+}
+
+async function displayRoomAssignments() {
+  const tableBody = document.getElementById('roomAssignmentsTable');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+  
+  try {
+    const assignments = await fetchRoomAssignments();
+    const patients = await fetchPatients();
+    
+    if (assignments.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No room assignments found</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    assignments.forEach(assignment => {
+      const patient = patients.find(p => p.id === assignment.patient_id);
+      const patientName = patient ? patient.name : `Unknown (ID: ${assignment.patient_id})`;
+      const dischargeDate = assignment.discharge_date ? 
+        new Date(assignment.discharge_date).toLocaleDateString() : 'Not discharged';
+      
+      const row = `
+        <tr>
+          <td>${patientName}</td>
+          <td>${assignment.room_number}</td>
+          <td>${new Date(assignment.admission_date).toLocaleDateString()}</td>
+          <td>${dischargeDate}</td>
+          <td>
+            ${assignment.discharge_date ? 
+              '<button class="btn btn-sm btn-outline-secondary" disabled>Discharge</button>' : 
+              `<button class="btn btn-sm btn-outline-danger discharge-btn" 
+                data-patient-id="${assignment.patient_id}">Discharge</button>`}
+          </td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+    
+    // Add event listeners to discharge buttons
+    document.querySelectorAll('.discharge-btn').forEach(btn => {
+      btn.addEventListener('click', function() {
+        const patientId = this.getAttribute('data-patient-id');
+        document.getElementById('dischargePatientId').value = patientId;
+        const modal = new bootstrap.Modal(document.getElementById('dischargeModal'));
+        modal.show();
+      });
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load assignments</td></tr>';
+  }
+}
+
+// Confirm Discharge
+document.getElementById('confirmDischargeBtn').addEventListener('click', async function() {
+  const patientId = document.getElementById('dischargePatientId').value;
+  
+  try {
+    const response = await fetch(`http://localhost:8000/api/discharge-patient?patient_id=${patientId}`, {
+      method: 'POST'
+    });
+    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const data = await response.json();
+    if (data.success) {
+      // Refresh displays
+      await displayRooms();
+      await displayRoomAssignments();
+      await populateAvailableRooms();
+      
+      // Close modal
+      bootstrap.Modal.getInstance(document.getElementById('dischargeModal')).hide();
+    }
+  } catch (error) {
+    console.error('Error discharging patient:', error);
+    alert('Failed to discharge patient. Please try again.');
+  }
+});
+
+// Assign Room Form
+document.getElementById('assignRoomForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('assignRoomSuccess');
+  const errorMsg = document.getElementById('assignRoomError');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const assignmentData = {
+    patient_id: parseInt(formData.get('patient_id')),
+    room_number: formData.get('room_number'),
+    admission_date: formData.get('admission_date'),
+    discharge_date: formData.get('discharge_date') || null
+  };
+  
+  try {
+    const response = await fetch('http://localhost:8000/api/assign-room', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assignmentData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    
+    // Refresh displays
+    await displayRooms();
+    await displayRoomAssignments();
+    await populateAvailableRooms();
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+  }
+});
+
+// Populate available rooms dropdown
+async function populateAvailableRooms() {
+  try {
+    const rooms = await fetchRooms('Available');
+    const select = document.getElementById('availableRoomsSelect');
+    
+    // Clear existing options except the first one
+    select.innerHTML = '<option value="">Select Available Room</option>';
+    
+    // Add room options
+    rooms.forEach(room => {
+      const option = document.createElement('option');
+      option.value = room.room_number;
+      option.textContent = `${room.room_number} (${room.room_type})`;
+      select.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating available rooms:', error);
+  }
+}
+
+// Staff Management
+async function fetchStaff(role = '') {
+  try {
+    let url = 'http://localhost:8000/api/staff';
+    if (role) {
+      url += `?role=${role}`;
+    }
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const data = await response.json();
+    return data.staff;
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    throw error;
+  }
+}
+
+async function populateStaffDropdowns() {
+  try {
+    // Populate staff type change handler
+    document.getElementById('staffTypeSelect').addEventListener('change', async function() {
+      const staffSelect = document.getElementById('staffSelect');
+      staffSelect.innerHTML = '<option value="">Select Staff Member</option>';
+      
+      if (this.value) {
+        const staff = await fetchStaff(this.value === 'doctor' ? 'Doctor' : 'Nurse');
+        staff.forEach(member => {
+          const option = document.createElement('option');
+          option.value = member.id;
+          option.textContent = `${member.name} (${member.department})`;
+          staffSelect.appendChild(option);
+        });
+        staffSelect.disabled = false;
+      } else {
+        staffSelect.disabled = true;
+      }
+    });
+    
+    // Populate surgeon dropdown
+    const surgeons = await fetchStaff('Doctor');
+    const surgeonSelect = document.getElementById('surgeonSelect');
+    surgeonSelect.innerHTML = '<option value="">Select Surgeon</option>';
+    surgeons.forEach(surgeon => {
+      const option = document.createElement('option');
+      option.value = surgeon.id;
+      option.textContent = `${surgeon.name} (${surgeon.department})`;
+      surgeonSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating staff dropdowns:', error);
+  }
+}
+
+// Assign Staff Form
+document.getElementById('assignStaffForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('assignStaffSuccess');
+  const errorMsg = document.getElementById('assignStaffError');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const assignmentData = {
+    patient_id: parseInt(formData.get('patient_id')),
+    staff_id: parseInt(formData.get('staff_id')),
+    staff_type: formData.get('staff_type')
+  };
+  
+  try {
+    const response = await fetch('http://localhost:8000/api/assign-staff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(assignmentData)
+    });
+    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status
+
   </script>
 </body>
 </html>
