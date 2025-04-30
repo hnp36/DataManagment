@@ -72,17 +72,131 @@
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 
-    <div id="StaffSuccessMsg" class="mt-3 text-success d-none">
+    <div id="staffSuccessMsg" class="mt-3 text-success d-none">
       Staff successfully added!
+    </div>
+    <div id="staffErrorMsg" class="mt-3 text-danger d-none">
+      Error adding staff. Please try again.
+    </div>
+    <div id="loadingIndicator" class="mt-3 d-none">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span class="ms-2">Processing...</span>
+    </div>
+
+    <!-- View Staff Section -->
+    <div class="mt-5">
+      <h4>Staff Records</h4>
+      <button id="viewStaffBtn" class="btn btn-outline-primary">View Staff</button>
+      <div id="staffList" style="display:none;">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Age</th>
+              <th>Gender</th>
+              <th>Employment No</th>
+              <th>Phone</th>
+              <th>Employment Type</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody id="staffTableBody">
+            <!-- Dynamic content -->
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 
   <script>
-    document.getElementById("addStaffForm").addEventListener("submit", function (e) {
+    document.getElementById("addStaffForm").addEventListener("submit", async function (e) {
       e.preventDefault();
-      document.getElementById("StaffSuccessMsg").classList.remove("d-none");
-      e.target.reset();
-      document.getElementById("roleField").classList.add("d-none"); // Hide role field again
+
+      const loadingIndicator = document.getElementById("loadingIndicator");
+      const errorMsg = document.getElementById("staffErrorMsg");
+      const successMsg = document.getElementById("staffSuccessMsg");
+
+      loadingIndicator.classList.remove("d-none");
+      errorMsg.classList.add("d-none");
+      successMsg.classList.add("d-none");
+
+      const formData = new FormData(e.target);
+      const staffData = {
+        first_name: formData.get("firstName"),
+        last_name: formData.get("lastName"),
+        age: parseInt(formData.get("age")),
+        employment_no: formData.get("employment_no"),
+        ssn: formData.get("ssn"),
+        street: formData.get("street"),
+        city: formData.get("city"),
+        state: formData.get("state"),
+        zip: formData.get("zip"),
+        gender: formData.get("gender"),
+        phone: formData.get("phone"),
+        emp_type: formData.get("emp_type"),
+        role: formData.get("role")
+      };
+
+      try {
+        const response = await fetch('http://localhost:8000/api/staff', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(staffData)
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const data = await response.json();
+        loadingIndicator.classList.add("d-none");
+        successMsg.classList.remove("d-none");
+        e.target.reset();
+        document.getElementById("roleField").classList.add("d-none");
+      } catch (error) {
+        loadingIndicator.classList.add("d-none");
+        errorMsg.classList.remove("d-none");
+        errorMsg.textContent = `Error: ${error.message}`;
+      }
+    });
+
+    document.getElementById("viewStaffBtn").addEventListener("click", async function () {
+      const tableBody = document.getElementById("staffTableBody");
+      const staffListDiv = document.getElementById("staffList");
+
+      tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>Loading...</td></tr>";
+      staffListDiv.style.display = "block";
+
+      try {
+        const response = await fetch("http://localhost:8000/api/staff");
+        const data = await response.json();
+        const staffMembers = data.staff;
+
+        if (staffMembers.length === 0) {
+          tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>No staff members found</td></tr>";
+          return;
+        }
+
+        tableBody.innerHTML = "";
+        staffMembers.forEach(staff => {
+          const row = `
+            <tr>
+              <td>${staff.id}</td>
+              <td>${staff.first_name} ${staff.last_name}</td>
+              <td>${staff.age}</td>
+              <td>${staff.gender}</td>
+              <td>${staff.employment_no}</td>
+              <td>${staff.phone}</td>
+              <td>${staff.emp_type}</td>
+              <td>${staff.role}</td>
+            </tr>`;
+          tableBody.innerHTML += row;
+        });
+      } catch (error) {
+        console.error("Error loading staff:", error);
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Failed to load staff.</td></tr>`;
+      }
     });
 
     // Dynamic Role selection based on Emp_Type

@@ -39,7 +39,6 @@
           <option value="Blue-102">Blue Wing - Room 102</option>
           <option value="Green-201">Green Wing - Room 201</option>
           <option value="Green-202">Green Wing - Room 202</option>
-          <!-- More rooms can be added as needed -->
         </select>
       </div>
 
@@ -65,16 +64,119 @@
     <div id="roomSuccessMsg" class="mt-3 text-success d-none">
       Room successfully assigned!
     </div>
+    <div id="roomErrorMsg" class="mt-3 text-danger d-none">
+      Error assigning room. Please try again.
+    </div>
+    <div id="loadingIndicator" class="mt-3 d-none">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span class="ms-2">Processing...</span>
+    </div>
+
+    <!-- View Room Assignments Section -->
+    <div class="mt-5">
+      <h4>Room Assignments</h4>
+      <button id="viewRoomsBtn" class="btn btn-outline-primary">View Assignments</button>
+      <div id="roomsList" style="display:none;">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Patient ID</th>
+              <th>Room</th>
+              <th>Bed</th>
+              <th>Admission Date</th>
+              <th>Nursing Unit</th>
+              <th>Assigned Nurse</th>
+            </tr>
+          </thead>
+          <tbody id="roomsTableBody">
+            <!-- Dynamic content -->
+          </tbody>
+        </table>
+      </div>
+    </div>
   </div>
 
   <script>
-    document.getElementById("assignRoomForm").addEventListener("submit", function (e) {
+    document.getElementById("assignRoomForm").addEventListener("submit", async function (e) {
       e.preventDefault();
-      // You can make an API call here using fetch() or axios
-      // For now, just show success message
-      document.getElementById("roomSuccessMsg").classList.remove("d-none");
-      // Optionally, reset form
-      e.target.reset();
+
+      const loadingIndicator = document.getElementById("loadingIndicator");
+      const errorMsg = document.getElementById("roomErrorMsg");
+      const successMsg = document.getElementById("roomSuccessMsg");
+
+      loadingIndicator.classList.remove("d-none");
+      errorMsg.classList.add("d-none");
+      successMsg.classList.add("d-none");
+
+      const formData = new FormData(e.target);
+      const roomData = {
+        patient_id: parseInt(formData.get("patientId")),
+        admission_date: formData.get("admissionDate"),
+        nursing_unit: formData.get("nursingUnit"),
+        room_number: formData.get("roomNumber"),
+        bed_number: formData.get("bedNumber"),
+        number_of_days: parseInt(formData.get("numberOfDays")),
+        assigned_nurse: formData.get("assignedNurse")
+      };
+
+      try {
+        const response = await fetch('http://localhost:8000/api/room-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(roomData)
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+        const data = await response.json();
+        loadingIndicator.classList.add("d-none");
+        successMsg.classList.remove("d-none");
+        e.target.reset();
+      } catch (error) {
+        loadingIndicator.classList.add("d-none");
+        errorMsg.classList.remove("d-none");
+        errorMsg.textContent = `Error: ${error.message}`;
+      }
+    });
+
+    document.getElementById("viewRoomsBtn").addEventListener("click", async function () {
+      const tableBody = document.getElementById("roomsTableBody");
+      const roomsListDiv = document.getElementById("roomsList");
+
+      tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>Loading...</td></tr>";
+      roomsListDiv.style.display = "block";
+
+      try {
+        const response = await fetch("http://localhost:8000/api/room-assignments");
+        const data = await response.json();
+        const assignments = data.assignments;
+
+        if (assignments.length === 0) {
+          tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>No room assignments found</td></tr>";
+          return;
+        }
+
+        tableBody.innerHTML = "";
+        assignments.forEach(assignment => {
+          const row = `
+            <tr>
+              <td>${assignment.id}</td>
+              <td>${assignment.patient_id}</td>
+              <td>${assignment.room_number}</td>
+              <td>${assignment.bed_number}</td>
+              <td>${new Date(assignment.admission_date).toLocaleDateString()}</td>
+              <td>${assignment.nursing_unit}</td>
+              <td>${assignment.assigned_nurse}</td>
+            </tr>`;
+          tableBody.innerHTML += row;
+        });
+      } catch (error) {
+        console.error("Error loading room assignments:", error);
+        tableBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center">Failed to load room assignments.</td></tr>`;
+      }
     });
   </script>
 </body>
