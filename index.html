@@ -106,65 +106,73 @@
         </div>
       </div>
 
-      <!-- In-Patient Management -->
-      <div class="tab-pane fade" id="inpatient">
-        <h3>In-Patient Management</h3>
-        <div class="mb-3">
-            <a href="addroom.html" class="btn btn-outline-primary">Assign Room</a>
+<!-- In-Patient Management -->
+<div class="tab-pane fade" id="inpatient">
+  <h3>In-Patient Management</h3>
+  <div class="mb-3">
+    <a href="addroom.html" class="btn btn-outline-primary">Assign Room</a>
+  </div>
+  
+  <!-- Room Assignments Section -->
+  <div class="mb-3">
+    <h5>Current Room Assignments</h5>
+    <button id="refreshRoomAssignmentsBtn" class="btn btn-outline-primary mb-2">Refresh Assignments</button>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Assignment ID</th>
+          <th>Patient</th>
+          <th>Room Number</th>
+          <th>Assigned Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="roomAssignmentsTableBody">
+        <tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Procedure Scheduling Section -->
+  <div class="mb-3">
+    <h5>Schedule a Procedure</h5>
+    <form id="scheduleProcedureForm">
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <select class="form-control" name="patient_id" id="procedurePatientSelect" required>
+            <option value="">Select Patient</option>
+          </select>
         </div>
-        <div class="mb-3">
-          <h5>Available Rooms</h5>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Type</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="3" class="text-center">No rooms available</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <select class="form-control" name="staff_id" id="procedureStaffSelect" required>
+            <option value="">Select Doctor</option>
+          </select>
         </div>
-        <div class="mb-3">
-            <h5>Book a Surgery</h5>
-            <form id="bookSurgeryForm">
-              <div class="mb-2">
-                <input type="text" class="form-control" name="patient_id" placeholder="Patient ID" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="surgeon" placeholder="Surgeon Name" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="room" placeholder="Room No." required />
-              </div>
-              <div class="mb-2">
-                <input type="date" class="form-control" name="date" required />
-              </div>
-              <button type="button" class="btn btn-outline-success">Book Surgery</button>
-
-            </form>
-            
-            <div id="surgerySuccessMsg" class="mt-3 text-success d-none">
-              Surgery successfully booked!
-            </div>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Surgeon</th>
-                <th>Room</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center">No surgeries scheduled</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <input type="text" class="form-control" name="room_number" placeholder="Room Number" required />
         </div>
       </div>
-
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input type="date" class="form-control" name="procedure_date" required />
+        </div>
+        <div class="col-md-4">
+          <input type="time" class="form-control" name="procedure_time" required />
+        </div>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success w-100">Schedule Procedure</button>
+        </div>
+      </div>
+    </form>
+    
+    <div id="procedureSuccessMsg" class="mt-3 alert alert-success d-none">
+      Procedure successfully scheduled!
+    </div>
+    <div id="procedureErrorMsg" class="mt-3 alert alert-danger d-none">
+      Error scheduling procedure.
+    </div>
+  </div>
+</div>
       <!-- clinic Staff Management -->
       <div class="tab-pane fade" id="staff">
         <h3>Clinic Staff Management</h3>
@@ -441,6 +449,149 @@
       populatePatientDropdowns();
       displayAppointments();
     });
+// Fetch and display room assignments
+async function fetchRoomAssignments() {
+  try {
+    const response = await fetch('http://localhost:8000/api/room-assignments');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.assignments || [];
+  } catch (error) {
+    console.error('Error fetching room assignments:', error);
+    throw error;
+  }
+}
+
+async function displayRoomAssignments() {
+  const tableBody = document.getElementById('roomAssignmentsTableBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>';
+  
+  try {
+    const assignments = await fetchRoomAssignments();
+    const patients = await fetchPatients();
+    
+    if (assignments.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No room assignments found</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    assignments.forEach(assignment => {
+      const patient = patients.find(p => p.id === assignment.patient_id);
+      const patientName = patient ? patient.name : `Patient ID: ${assignment.patient_id}`;
+      const formattedDate = formatDate(assignment.assignment_date);
+      
+      const row = `
+        <tr>
+          <td>${assignment.id}</td>
+          <td>${patientName}</td>
+          <td>${assignment.room_number}</td>
+          <td>${formattedDate}</td>
+          <td>${assignment.status || 'active'}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load room assignments</td></tr>';
+  }
+}
+
+// Populate patient dropdown for procedure scheduling
+async function populateProcedurePatientDropdown() {
+  try {
+    const patients = await fetchPatients();
+    const patientSelect = document.getElementById('procedurePatientSelect');
+    
+    // Clear existing options except the first one
+    patientSelect.innerHTML = '<option value="">Select Patient</option>';
+    
+    // Add patient options
+    patients.forEach(patient => {
+      const option = document.createElement('option');
+      option.value = patient.id;
+      option.textContent = `${patient.name} (ID: ${patient.id})`;
+      patientSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating patient dropdown:', error);
+  }
+}
+
+// Populate staff dropdown for procedure scheduling
+async function populateProcedureStaffDropdown() {
+  try {
+    const response = await fetch('http://localhost:8000/api/staff');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    const staff = data.staff || [];
+    
+    const staffSelect = document.getElementById('procedureStaffSelect');
+    staffSelect.innerHTML = '<option value="">Select Doctor</option>';
+    
+    staff.forEach(person => {
+      const option = document.createElement('option');
+      option.value = person.id;
+      option.textContent = `${person.name} (${person.role || 'Staff'})`;
+      staffSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating staff dropdown:', error);
+  }
+}
+
+// Handle procedure scheduling form submission
+document.getElementById('scheduleProcedureForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('procedureSuccessMsg');
+  const errorMsg = document.getElementById('procedureErrorMsg');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const procedureData = {
+    patient_id: parseInt(formData.get('patient_id')),
+    staff_id: parseInt(formData.get('staff_id')),
+    room_number: formData.get('room_number'),
+    procedure_date: formData.get('procedure_date'),
+    procedure_time: formData.get('procedure_time')
+  };
+  
+  try {
+    // Since we don't have a procedures endpoint, we'll simulate the response
+    console.log('Procedure data to be sent:', procedureData);
+    
+    // Simulate success response
+    successMsg.classList.remove('d-none');
+    successMsg.textContent = 'Procedure scheduling simulated (endpoint not implemented)';
+    e.target.reset();
+    
+    // In a real implementation, you would:
+    // 1. Create a /api/procedures endpoint on your backend
+    // 2. Send the data to that endpoint
+    // 3. Handle the response appropriately
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+    console.error('Error scheduling procedure:', error);
+  }
+});
+
+// Initialize in-patient management tab when it's shown
+document.querySelector('a[href="#inpatient"]').addEventListener('shown.bs.tab', function() {
+  displayRoomAssignments();
+  populateProcedurePatientDropdown();
+  populateProcedureStaffDropdown();
+});
+
+// Refresh button for room assignments
+document.getElementById('refreshRoomAssignmentsBtn').addEventListener('click', displayRoomAssignments);
   </script>
 </body>
 </html>
