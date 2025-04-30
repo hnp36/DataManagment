@@ -35,39 +35,82 @@
       <!-- Patient Management -->
       <div class="tab-pane fade show active" id="patient">
         <h3>Patient Management</h3>
+
+        <!-- Add New Patient -->
         <div class="mb-3">
-            <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
+          <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
         </div>
-        <div class="mb-3">
-          <h5>Appointments</h5>
+
+        <!-- Schedule Appointment -->
+        <div class="mb-4">
+          <h5>Schedule an Appointment</h5>
+          <form id="appointmentForm">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <select class="form-control" name="patient_id" id="patientSelect" required>
+                  <option value="">Select Patient</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <input type="text" class="form-control" name="doctor" placeholder="Doctor Name" required />
+              </div>
+              <div class="col-md-2">
+                <input type="date" class="form-control" name="appointment_date" required />
+              </div>
+              <div class="col-md-2">
+                <input type="time" class="form-control" name="appointment_time" required />
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-success w-100">Schedule</button>
+              </div>
+            </div>
+          </form>
+          <div id="appointmentSuccessMsg" class="mt-2 text-success d-none">Appointment scheduled!</div>
+          <div id="appointmentErrorMsg" class="mt-2 text-danger d-none">Error scheduling appointment.</div>
+        </div>
+
+        <!-- View Scheduled Appointments -->
+        <div class="mb-4">
+          <h5>Scheduled Appointments</h5>
+          <button id="refreshAppointmentsBtn" class="btn btn-outline-primary">Refresh Appointments</button>
           <table class="table table-bordered">
             <thead>
               <tr>
-                <th>Patient</th>
+                <th>ID</th>
+                <th>Patient Name</th>
                 <th>Doctor</th>
                 <th>Date</th>
                 <th>Time</th>
               </tr>
             </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center">No appointments scheduled</td></tr>
+            <tbody id="appointmentTableBody">
+              <tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="mb-3">
+
+        <!-- Check Previous Diagnoses -->
+        <div class="mb-4">
           <h5>Previous Diagnoses</h5>
-          <ul class="list-group">
+          <form id="diagnosisLookupForm" class="mb-3">
+            <div class="input-group">
+              <select class="form-control" id="patientSelectForDiagnosis">
+                <option value="">Select patient to view diagnoses</option>
+              </select>
+              <button type="submit" class="btn btn-outline-secondary">Search</button>
+            </div>
+          </form>
+          <ul class="list-group" id="diagnosisList">
             <li class="list-group-item">No records found</li>
           </ul>
         </div>
       </div>
-      
 
       <!-- In-Patient Management -->
       <div class="tab-pane fade" id="inpatient">
         <h3>In-Patient Management</h3>
         <div class="mb-3">
-            <button type="button" class="btn btn-outline-success">Assign Room</button>
+            <a href="addroom.html" class="btn btn-outline-primary">Assign Room</a>
         </div>
         <div class="mb-3">
           <h5>Available Rooms</h5>
@@ -126,7 +169,8 @@
       <div class="tab-pane fade" id="staff">
         <h3>Clinic Staff Management</h3>
         <div class="mb-3">
-        <button type="button" class="btn btn-outline-info">Add Staff Member</button>
+        
+        <a href="addstaff.html" class="btn btn-outline-primary">Add New Staff</a>
         </div>
         <div class="mb-3">
           <h5>Staff by Job Type</h5>
@@ -164,5 +208,239 @@
   </div>
 
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // Store patients data globally for reference
+    let patientsData = [];
+
+    // Format time from seconds or HH:MM:SS to readable format
+    function formatTime(timeString) {
+      // Check if the time is in seconds format (like 51900)
+      if (!isNaN(timeString) && String(timeString).length <= 5) {
+        // Convert seconds to HH:MM:SS
+        const hours = Math.floor(timeString / 3600);
+        const minutes = Math.floor((timeString % 3600) / 60);
+        const seconds = timeString % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      } 
+      
+      // If it's already in HH:MM:SS format or contains colons
+      if (timeString.includes(':')) {
+        // Just ensure it has seconds if it's HH:MM format
+        const parts = timeString.split(':');
+        if (parts.length === 2) {
+          return `${parts[0]}:${parts[1]}:00`;
+        }
+        return timeString;
+      }
+      
+      // For any other format, return as is
+      return timeString;
+    }
+
+    // Format date from YYYY-MM-DD to DD/MM/YYYY for display
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return as is if invalid
+      
+      return date.toLocaleDateString('en-GB'); // Format as DD/MM/YYYY
+    }
+
+    // Get patient name by ID
+    function getPatientNameById(patientId) {
+      const patient = patientsData.find(p => p.id === parseInt(patientId));
+      return patient ? patient.name : `Unknown (ID: ${patientId})`;
+    }
+
+    // Fetch patient list for dropdowns
+    async function fetchPatients() {
+      try {
+        const response = await fetch('http://localhost:8000/api/patients');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        patientsData = data.patients; // Store for later reference
+        return data.patients;
+      } catch (error) {
+        console.error('Error fetching patients:', error);
+        throw error;
+      }
+    }
+
+    // Populate patient dropdowns
+    async function populatePatientDropdowns() {
+      try {
+        const patients = await fetchPatients();
+        const patientSelect = document.getElementById('patientSelect');
+        const patientSelectForDiagnosis = document.getElementById('patientSelectForDiagnosis');
+        
+        // Clear existing options except the first one
+        patientSelect.innerHTML = '<option value="">Select Patient</option>';
+        patientSelectForDiagnosis.innerHTML = '<option value="">Select patient to view diagnoses</option>';
+        
+        // Add patient options
+        patients.forEach(patient => {
+          const option1 = document.createElement('option');
+          option1.value = patient.id;
+          option1.textContent = `${patient.name} (ID: ${patient.id})`;
+          patientSelect.appendChild(option1);
+          
+          const option2 = document.createElement('option');
+          option2.value = patient.id;
+          option2.textContent = `${patient.name} (ID: ${patient.id})`;
+          patientSelectForDiagnosis.appendChild(option2);
+        });
+      } catch (error) {
+        alert('Failed to fetch patient list. Please check if the server is running.');
+      }
+    }
+
+    // Fetch appointments
+    async function fetchAppointments() {
+      try {
+        const response = await fetch('http://localhost:8000/api/appointments');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.appointments;
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        throw error;
+      }
+    }
+
+    // Display appointments in table
+    async function displayAppointments() {
+      const tableBody = document.getElementById('appointmentTableBody');
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+      
+      try {
+        const appointments = await fetchAppointments();
+        
+        if (appointments.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>';
+          return;
+        }
+        
+        tableBody.innerHTML = '';
+        appointments.forEach(appointment => {
+          const patientName = getPatientNameById(appointment.patient_id);
+          const formattedTime = formatTime(appointment.appointment_time);
+          const formattedDate = formatDate(appointment.appointment_date);
+          
+          const row = `
+            <tr>
+              <td>${appointment.id}</td>
+              <td>${patientName}</td>
+              <td>${appointment.doctor}</td>
+              <td>${formattedDate}</td>
+              <td>${formattedTime}</td>
+            </tr>
+          `;
+          tableBody.innerHTML += row;
+        });
+      } catch (error) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load appointments</td></tr>';
+      }
+    }
+
+    // Handle appointment form submission
+    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const successMsg = document.getElementById('appointmentSuccessMsg');
+      const errorMsg = document.getElementById('appointmentErrorMsg');
+      
+      successMsg.classList.add('d-none');
+      errorMsg.classList.add('d-none');
+      
+      const formData = new FormData(e.target);
+      const appointmentData = {
+        patient_id: parseInt(formData.get('patient_id')),
+        doctor: formData.get('doctor'),
+        appointment_date: formData.get('appointment_date'),
+        appointment_time: formData.get('appointment_time')
+      };
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appointmentData)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        successMsg.classList.remove('d-none');
+        e.target.reset();
+        
+        // Refresh the appointments table
+        await displayAppointments();
+      } catch (error) {
+        errorMsg.classList.remove('d-none');
+        errorMsg.textContent = `Error: ${error.message}. Is the server running?`;
+      }
+    });
+
+    // Handle diagnosis lookup form submission
+    document.getElementById('diagnosisLookupForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const patientId = document.getElementById('patientSelectForDiagnosis').value;
+      if (!patientId) {
+        alert('Please select a patient');
+        return;
+      }
+      
+      const diagnosisList = document.getElementById('diagnosisList');
+      diagnosisList.innerHTML = '<li class="list-group-item">Loading...</li>';
+      
+      try {
+        const response = await fetch(`http://localhost:8000/api/diagnoses/${patientId}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const diagnoses = data.diagnoses;
+        
+        if (diagnoses.length === 0) {
+          diagnosisList.innerHTML = '<li class="list-group-item">No diagnoses found for this patient</li>';
+          return;
+        }
+        
+        diagnosisList.innerHTML = '';
+        diagnoses.forEach(diagnosis => {
+          const formattedDate = formatDate(diagnosis.diagnosis_date);
+          const item = `
+            <li class="list-group-item">
+              <strong>Date:</strong> ${formattedDate} 
+              <br>
+              <strong>Diagnosis:</strong> ${diagnosis.diagnosis}
+            </li>
+          `;
+          diagnosisList.innerHTML += item;
+        });
+      } catch (error) {
+        diagnosisList.innerHTML = `<li class="list-group-item text-danger">Failed to load diagnoses: ${error.message}</li>`;
+      }
+    });
+
+    // Refresh appointments button
+    document.getElementById('refreshAppointmentsBtn').addEventListener('click', displayAppointments);
+
+    // Initialize page: populate dropdowns and load appointments
+    document.addEventListener('DOMContentLoaded', function() {
+      populatePatientDropdowns();
+      displayAppointments();
+    });
+  </script>
 </body>
 </html>
