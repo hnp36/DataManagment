@@ -950,36 +950,24 @@ async function handleRemoveStaff(e) {
   }
   
   try {
-    // In a real implementation, you would send a DELETE request to your API
-    // For now, just simulate successful deletion
-    console.log(`Removing staff with ID: ${staffId}`);
-    
-    // Show success message
-    successMsg.classList.remove('d-none');
-    e.target.reset();
-    document.getElementById('confirmRemoval').checked = false;
-    
-    // Close the modal after a short delay
-    setTimeout(() => {
-      const modal = bootstrap.Modal.getInstance(document.getElementById('removeStaffModal'));
-      modal.hide();
-    }, 1500);
-    
-    // Refresh the staff table and dropdowns
-    await displayStaffByJobType();
-    await populateStaffDropdowns();
-    
-    // When you have the actual API, use code like this:
-    /*
+    // Actual API call to remove staff
     const response = await fetch(`http://localhost:8000/api/staff/${staffId}`, {
-      method: 'DELETE'
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
     });
     
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
     }
     
+    // Show success message
+    successMsg.textContent = 'Staff member successfully removed';
     successMsg.classList.remove('d-none');
+    
+    // Reset form
     e.target.reset();
     document.getElementById('confirmRemoval').checked = false;
     
@@ -992,10 +980,10 @@ async function handleRemoveStaff(e) {
     // Refresh the staff table and dropdowns
     await displayStaffByJobType();
     await populateStaffDropdowns();
-    */
+    
   } catch (error) {
-    errorMsg.classList.remove('d-none');
     errorMsg.textContent = `Error: ${error.message}`;
+    errorMsg.classList.remove('d-none');
     console.error('Error removing staff:', error);
   }
 }

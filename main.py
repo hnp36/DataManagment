@@ -177,7 +177,7 @@ class RoomAssignment(BaseModel):
 
 # Routes
 
-# Patient Routes (existing)
+# Patient Routes
 @app.post("/api/patients")
 async def add_patient(patient: Patient):
     connection = create_connection()
@@ -212,7 +212,7 @@ async def get_patients():
         cursor.close()
         connection.close()
 
-# Appointment Routes (existing)
+# Appointment Routes
 @app.post("/api/appointments")
 async def schedule_appointment(appointment: Appointment):
     connection = create_connection()
@@ -260,7 +260,7 @@ async def get_appointments(doctor: Optional[str] = None, date: Optional[str] = N
         cursor.close()
         connection.close()
 
-# Diagnosis Routes (existing)
+# Diagnosis Routes
 @app.post("/api/diagnoses")
 async def add_diagnosis(diag: Diagnosis):
     connection = create_connection()
@@ -295,7 +295,7 @@ async def get_diagnoses(patient_id: int):
         cursor.close()
         connection.close()
 
-# Staff Routes (new)
+# Staff Routes
 @app.post("/api/staff")
 async def add_staff(staff: Staff):
     connection = create_connection()
@@ -316,7 +316,7 @@ async def add_staff(staff: Staff):
         connection.commit()
         return {"message": "Staff added successfully", "success": True}
     except Error as e:
-        logger.error(f"Error adding staff: {e}")  # Log the error
+        logger.error(f"Error adding staff: {e}")
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         cursor.close()
@@ -337,7 +337,36 @@ async def get_staff():
         cursor.close()
         connection.close()
 
-# Room Assignment Routes (new)
+@app.delete("/api/staff/{staff_id}")
+async def delete_staff(staff_id: int):
+    connection = create_connection()
+    if not connection:
+        raise HTTPException(status_code=500, detail="DB connection failed")
+    try:
+        cursor = connection.cursor()
+        
+        # First check if staff exists
+        cursor.execute("SELECT id FROM staff WHERE id = %s", (staff_id,))
+        if not cursor.fetchone():
+            raise HTTPException(status_code=404, detail="Staff member not found")
+        
+        # Delete the staff member
+        cursor.execute("DELETE FROM staff WHERE id = %s", (staff_id,))
+        connection.commit()
+        
+        # Check if deletion was successful
+        if cursor.rowcount == 0:
+            raise HTTPException(status_code=500, detail="Failed to delete staff member")
+            
+        return {"message": "Staff member deleted successfully", "success": True}
+    except Error as e:
+        logger.error(f"Error deleting staff: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        cursor.close()
+        connection.close()
+
+# Room Assignment Routes
 @app.post("/api/room-assignments")
 async def assign_room(assignment: RoomAssignment):
     connection = create_connection()
@@ -378,7 +407,7 @@ async def get_room_assignments():
         cursor.close()
         connection.close()
 
-# Utility Routes (existing)
+# Utility Routes
 @app.get("/api/patient-id")
 async def get_patient_id(name: str):
     connection = create_connection()
