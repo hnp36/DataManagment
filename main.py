@@ -1,13 +1,13 @@
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import Optional
 import mysql.connector
 from mysql.connector import Error
 import logging
-from datetime import date
+from contextlib import contextmanager
 
-# Logging
+# Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -22,8 +22,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Database Connection
-def create_connection():
+# Database connection helper
+@contextmanager
+def get_db_connection():
+    connection = None
     try:
         connection = mysql.connector.connect(
             host='localhost',
@@ -31,108 +33,127 @@ def create_connection():
             user='medical_user',
             password='medical_password'
         )
-        if connection.is_connected():
-            return connection
+        yield connection
     except Error as e:
-        logger.error(f"MySQL connection error: {e}")
-    return None
-
-# Table Creation
-def create_tables():
-    connection = create_connection()
-    if not connection:
-        return
-
-    try:
-        cursor = connection.cursor()
-
-        # Patients Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS patients (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                age INT NOT NULL,
-                gender VARCHAR(10) NOT NULL,
-                phone VARCHAR(20) NOT NULL,
-                email VARCHAR(100) NOT NULL,
-                address VARCHAR(255) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Appointments Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS appointments (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                patient_id INT NOT NULL,
-                doctor VARCHAR(100) NOT NULL,
-                appointment_date DATE NOT NULL,
-                appointment_time TIME NOT NULL,
-                FOREIGN KEY (patient_id) REFERENCES patients(id)
-            )
-        ''')
-
-        # Diagnoses Table - FIXED SYNTAX
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS diagnoses (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                patient_id INT NOT NULL,
-                diagnosis TEXT NOT NULL,
-                diagnosis_date DATE NOT NULL DEFAULT (CURRENT_DATE),
-                FOREIGN KEY (patient_id) REFERENCES patients(id)
-            )
-        ''')
-
-        # Staff Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS staff (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                first_name VARCHAR(50) NOT NULL,
-                last_name VARCHAR(50) NOT NULL,
-                age INT NOT NULL,
-                employment_no VARCHAR(20) UNIQUE NOT NULL,
-                ssn VARCHAR(20) UNIQUE NOT NULL,
-                street VARCHAR(100) NOT NULL,
-                city VARCHAR(50) NOT NULL,
-                state VARCHAR(50) NOT NULL,
-                zip VARCHAR(20) NOT NULL,
-                gender VARCHAR(10) NOT NULL,
-                phone VARCHAR(20) NOT NULL,
-                emp_type VARCHAR(20) NOT NULL,
-                role VARCHAR(50) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        ''')
-
-        # Room Assignments Table
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS room_assignments (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                patient_id INT NOT NULL,
-                admission_date DATE NOT NULL,
-                nursing_unit VARCHAR(20) NOT NULL,
-                room_number VARCHAR(20) NOT NULL,
-                bed_number VARCHAR(10) NOT NULL,
-                number_of_days INT NOT NULL,
-                assigned_nurse VARCHAR(100) NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (patient_id) REFERENCES patients(id)
-            )
-        ''')
-
-        connection.commit()
-        logger.info("Tables created or already exist.")
-    except Error as e:
-        logger.error(f"Error creating tables: {e}")
+        logger.error(f"Database connection error: {e}")
+        raise HTTPException(status_code=500, detail="Database connection failed")
     finally:
-        cursor.close()
-        connection.close()
+        if connection and connection.is_connected():
+            connection.close()
 
-@app.on_event("startup")
-async def on_startup():
-    create_tables()
+# Database cursor helper
+@contextmanager
+def get_db_cursor(connection):
+    cursor = None
+    try:
+        cursor = connection.cursor(dictionary=True)
+        yield cursor
+    except Error as e:
+        logger.error(f"Database cursor error: {e}")
+        raise HTTPException(status_code=500, detail="Database operation failed")
+    finally:
+        if cursor:
+            cursor.close()
 
-# Schemas
+# Table creation function
+def create_tables():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Patients Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS patients (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        name VARCHAR(100) NOT NULL,
+                        age INT NOT NULL,
+                        gender VARCHAR(10) NOT NULL,
+                        phone VARCHAR(20) NOT NULL,
+                        email VARCHAR(100) NOT NULL,
+                        address VARCHAR(255) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Appointments Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS appointments (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        patient_id INT NOT NULL,
+                        doctor VARCHAR(100) NOT NULL,
+                        appointment_date DATE NOT NULL,
+                        appointment_time TIME NOT NULL,
+                        FOREIGN KEY (patient_id) REFERENCES patients(id)
+                    )
+                ''')
+
+                # Diagnoses Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS diagnoses (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        patient_id INT NOT NULL,
+                        diagnosis TEXT NOT NULL,
+                        diagnosis_date DATE NOT NULL DEFAULT (CURRENT_DATE),
+                        FOREIGN KEY (patient_id) REFERENCES patients(id)
+                    )
+                ''')
+
+                # Staff Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS staff (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        first_name VARCHAR(50) NOT NULL,
+                        last_name VARCHAR(50) NOT NULL,
+                        age INT NOT NULL,
+                        employment_no VARCHAR(20) UNIQUE NOT NULL,
+                        ssn VARCHAR(20) UNIQUE NOT NULL,
+                        street VARCHAR(100) NOT NULL,
+                        city VARCHAR(50) NOT NULL,
+                        state VARCHAR(50) NOT NULL,
+                        zip VARCHAR(20) NOT NULL,
+                        gender VARCHAR(10) NOT NULL,
+                        phone VARCHAR(20) NOT NULL,
+                        emp_type VARCHAR(20) NOT NULL,
+                        role VARCHAR(50) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                ''')
+
+                # Room Assignments Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS room_assignments (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        patient_id INT NOT NULL,
+                        admission_date DATE NOT NULL,
+                        nursing_unit VARCHAR(20) NOT NULL,
+                        room_number VARCHAR(20) NOT NULL,
+                        bed_number VARCHAR(10) NOT NULL,
+                        number_of_days INT NOT NULL,
+                        assigned_nurse VARCHAR(100) NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (patient_id) REFERENCES patients(id)
+                    )
+                ''')
+
+                # Shifts Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS shifts (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        staff_id INT NOT NULL,
+                        shift_type VARCHAR(20) NOT NULL,
+                        shift_date DATE NOT NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (staff_id) REFERENCES staff(id)
+                    )
+                ''')
+
+                connection.commit()
+                logger.info("Tables created successfully")
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error creating tables: {e}")
+                raise HTTPException(status_code=500, detail="Table creation failed")
+
+# Models
 class Patient(BaseModel):
     name: str
     age: int
@@ -144,8 +165,8 @@ class Patient(BaseModel):
 class Appointment(BaseModel):
     patient_id: int
     doctor: str
-    appointment_date: str  # Format: YYYY-MM-DD
-    appointment_time: str  # Format: HH:MM:SS
+    appointment_date: str
+    appointment_time: str
 
 class Diagnosis(BaseModel):
     patient_id: int
@@ -168,269 +189,283 @@ class Staff(BaseModel):
 
 class RoomAssignment(BaseModel):
     patient_id: int
-    admission_date: str  # Format: YYYY-MM-DD
+    admission_date: str
     nursing_unit: str
     room_number: str
     bed_number: str
     number_of_days: int
     assigned_nurse: str
 
+class Shift(BaseModel):
+    staff_id: int
+    shift_type: str
+    shift_date: str
+
+# Startup event
+@app.on_event("startup")
+async def startup_event():
+    create_tables()
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+# Root endpoint
+@app.get("/")
+async def root():
+    return {"message": "Newark Medical Associates API is running"}
+
 # Routes
 
 # Patient Routes
 @app.post("/api/patients")
 async def add_patient(patient: Patient):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO patients (name, age, gender, phone, email, address)
-            VALUES (%s, %s, %s, %s, %s, %s)
-        """, (patient.name, patient.age, patient.gender, patient.phone, patient.email, patient.address))
-        connection.commit()
-        return {"message": "Patient added", "success": True}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO patients (name, age, gender, phone, email, address)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                """, (patient.name, patient.age, patient.gender, patient.phone, patient.email, patient.address))
+                connection.commit()
+                return {"message": "Patient added", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/patients")
 async def get_patients():
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM patients")
-        return {"patients": cursor.fetchall()}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT * FROM patients")
+                return {"patients": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Appointment Routes
 @app.post("/api/appointments")
 async def schedule_appointment(appointment: Appointment):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO appointments (patient_id, doctor, appointment_date, appointment_time)
-            VALUES (%s, %s, %s, %s)
-        """, (appointment.patient_id, appointment.doctor, appointment.appointment_date, appointment.appointment_time))
-        connection.commit()
-        return {"message": "Appointment scheduled", "success": True}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO appointments (patient_id, doctor, appointment_date, appointment_time)
+                    VALUES (%s, %s, %s, %s)
+                """, (appointment.patient_id, appointment.doctor, appointment.appointment_date, appointment.appointment_time))
+                connection.commit()
+                return {"message": "Appointment scheduled", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/appointments")
 async def get_appointments(doctor: Optional[str] = None, date: Optional[str] = None):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor(dictionary=True)
-        query = "SELECT * FROM appointments"
-        filters = []
-        params = []
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                query = "SELECT * FROM appointments"
+                filters = []
+                params = []
 
-        if doctor:
-            filters.append("doctor = %s")
-            params.append(doctor)
-        if date:
-            filters.append("appointment_date = %s")
-            params.append(date)
-        if filters:
-            query += " WHERE " + " AND ".join(filters)
+                if doctor:
+                    filters.append("doctor = %s")
+                    params.append(doctor)
+                if date:
+                    filters.append("appointment_date = %s")
+                    params.append(date)
+                if filters:
+                    query += " WHERE " + " AND ".join(filters)
 
-        cursor.execute(query, params)
-        return {"appointments": cursor.fetchall()}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+                cursor.execute(query, params)
+                return {"appointments": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Diagnosis Routes
 @app.post("/api/diagnoses")
 async def add_diagnosis(diag: Diagnosis):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO diagnoses (patient_id, diagnosis)
-            VALUES (%s, %s)
-        """, (diag.patient_id, diag.diagnosis))
-        connection.commit()
-        return {"message": "Diagnosis recorded", "success": True}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO diagnoses (patient_id, diagnosis)
+                    VALUES (%s, %s)
+                """, (diag.patient_id, diag.diagnosis))
+                connection.commit()
+                return {"message": "Diagnosis recorded", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/diagnoses/{patient_id}")
 async def get_diagnoses(patient_id: int):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM diagnoses WHERE patient_id = %s", (patient_id,))
-        return {"diagnoses": cursor.fetchall()}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT * FROM diagnoses WHERE patient_id = %s", (patient_id,))
+                return {"diagnoses": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Staff Routes
 @app.post("/api/staff")
 async def add_staff(staff: Staff):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO staff (
-                first_name, last_name, age, employment_no, ssn,
-                street, city, state, zip, gender, phone, emp_type, role
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """, (
-            staff.first_name, staff.last_name, staff.age, staff.employment_no, staff.ssn,
-            staff.street, staff.city, staff.state, staff.zip, staff.gender,
-            staff.phone, staff.emp_type, staff.role
-        ))
-        connection.commit()
-        return {"message": "Staff added successfully", "success": True}
-    except Error as e:
-        logger.error(f"Error adding staff: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO staff (
+                        first_name, last_name, age, employment_no, ssn,
+                        street, city, state, zip, gender, phone, emp_type, role
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    staff.first_name, staff.last_name, staff.age, staff.employment_no, staff.ssn,
+                    staff.street, staff.city, staff.state, staff.zip, staff.gender,
+                    staff.phone, staff.emp_type, staff.role
+                ))
+                connection.commit()
+                return {"message": "Staff added successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error adding staff: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/staff")
 async def get_staff():
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM staff")
-        return {"staff": cursor.fetchall()}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT * FROM staff")
+                return {"staff": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/staff/{staff_id}")
 async def delete_staff(staff_id: int):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        
-        # First check if staff exists
-        cursor.execute("SELECT id FROM staff WHERE id = %s", (staff_id,))
-        if not cursor.fetchone():
-            raise HTTPException(status_code=404, detail="Staff member not found")
-        
-        # Delete the staff member
-        cursor.execute("DELETE FROM staff WHERE id = %s", (staff_id,))
-        connection.commit()
-        
-        # Check if deletion was successful
-        if cursor.rowcount == 0:
-            raise HTTPException(status_code=500, detail="Failed to delete staff member")
-            
-        return {"message": "Staff member deleted successfully", "success": True}
-    except Error as e:
-        logger.error(f"Error deleting staff: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # First check if staff exists
+                cursor.execute("SELECT id FROM staff WHERE id = %s", (staff_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Staff member not found")
+                
+                # Delete the staff member
+                cursor.execute("DELETE FROM staff WHERE id = %s", (staff_id,))
+                connection.commit()
+                
+                # Check if deletion was successful
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=500, detail="Failed to delete staff member")
+                    
+                return {"message": "Staff member deleted successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error deleting staff: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Room Assignment Routes
 @app.post("/api/room-assignments")
 async def assign_room(assignment: RoomAssignment):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("""
-            INSERT INTO room_assignments (
-                patient_id, admission_date, nursing_unit,
-                room_number, bed_number, number_of_days, assigned_nurse
-            ) VALUES (%s, %s, %s, %s, %s, %s, %s)
-        """, (
-            assignment.patient_id, assignment.admission_date, assignment.nursing_unit,
-            assignment.room_number, assignment.bed_number, assignment.number_of_days,
-            assignment.assigned_nurse
-        ))
-        connection.commit()
-        return {"message": "Room assigned successfully", "success": True}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO room_assignments (
+                        patient_id, admission_date, nursing_unit,
+                        room_number, bed_number, number_of_days, assigned_nurse
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """, (
+                    assignment.patient_id, assignment.admission_date, assignment.nursing_unit,
+                    assignment.room_number, assignment.bed_number, assignment.number_of_days,
+                    assignment.assigned_nurse
+                ))
+                connection.commit()
+                return {"message": "Room assigned successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/room-assignments")
 async def get_room_assignments():
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT * FROM room_assignments")
-        return {"assignments": cursor.fetchall()}
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT * FROM room_assignments")
+                return {"assignments": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Utility Routes
 @app.get("/api/patient-id")
 async def get_patient_id(name: str):
-    connection = create_connection()
-    if not connection:
-        raise HTTPException(status_code=500, detail="DB connection failed")
-    try:
-        cursor = connection.cursor()
-        cursor.execute("SELECT id FROM patients WHERE name = %s", (name,))
-        result = cursor.fetchone()
-        if result:
-            return {"patient_id": result[0]}
-        else:
-            raise HTTPException(status_code=404, detail="Patient not found")
-    except Error as e:
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        cursor.close()
-        connection.close()
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT id FROM patients WHERE name = %s", (name,))
+                result = cursor.fetchone()
+                if result:
+                    return {"patient_id": result[0]}
+                else:
+                    raise HTTPException(status_code=404, detail="Patient not found")
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
+# Shifts Routes
+@app.post("/api/shifts")
+async def schedule_shift(shift: Shift):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO shifts (staff_id, shift_type, shift_date)
+                    VALUES (%s, %s, %s)
+                """, (shift.staff_id, shift.shift_type, shift.shift_date))
+                connection.commit()
+                return {"message": "Shift scheduled successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error scheduling shift: {e}")
+                raise HTTPException(status_code=500, detail="Failed to schedule shift")
 
-@app.get("/")
-async def root():
-    return {"message": "Newark Medical Associates API is running"}
+@app.get("/api/shifts")
+async def get_shifts():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    SELECT s.id, s.staff_id, 
+                           CONCAT(st.first_name, ' ', st.last_name) AS staff_name,
+                           st.role, s.shift_type, s.shift_date
+                    FROM shifts s
+                    JOIN staff st ON s.staff_id = st.id
+                    ORDER BY s.shift_date DESC
+                """)
+                shifts = cursor.fetchall()
+                
+                # Format dates properly
+                for shift in shifts:
+                    if shift['shift_date']:
+                        shift['formatted_date'] = shift['shift_date'].strftime('%m/%d/%Y')
+                
+                return {"shifts": shifts}
+            except Error as e:
+                logger.error(f"Error fetching shifts: {e}")
+                raise HTTPException(status_code=500, detail="Failed to fetch shifts")
+            
+@app.delete("/api/shifts/{shift_id}")
+async def delete_shift(shift_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("DELETE FROM shifts WHERE id = %s", (shift_id,))
+                connection.commit()
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Shift not found")
+                return {"message": "Shift deleted successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error deleting shift: {e}")
+                raise HTTPException(status_code=500, detail="Failed to delete shift")

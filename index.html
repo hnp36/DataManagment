@@ -797,7 +797,6 @@ async function fetchShifts() {
   }
 }
 
-// Display all scheduled shifts
 async function displayShifts() {
   const tableBody = document.getElementById('shiftsTableBody');
   tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading shifts...</td></tr>';
@@ -812,14 +811,12 @@ async function displayShifts() {
     
     tableBody.innerHTML = '';
     shifts.forEach(shift => {
-      const formattedDate = new Date(shift.shift_date).toLocaleDateString('en-US');
-      
       const row = `
         <tr>
-          <td>${shift.staff_name}</td>
-          <td>${shift.role}</td>
-          <td>${shift.shift_type}</td>
-          <td>${formattedDate}</td>
+          <td>${shift.staff_name || 'Unknown'}</td>
+          <td>${shift.role || 'N/A'}</td>
+          <td>${shift.shift_type || 'N/A'}</td>
+          <td>${shift.formatted_date || shift.shift_date || 'N/A'}</td>
           <td>
             <button class="btn btn-sm btn-danger delete-shift" data-shift-id="${shift.id}">
               Cancel Shift
@@ -836,6 +833,7 @@ async function displayShifts() {
     });
   } catch (error) {
     tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load shifts</td></tr>';
+    console.error('Error loading shifts:', error);
   }
 }
 
@@ -1018,6 +1016,84 @@ document.querySelector('a[href="#staff"]').addEventListener('shown.bs.tab', func
   displayShifts();
   setupEventListeners();
 });
+
+// Replace the mock fetchShifts function with:
+async function fetchShifts() {
+  try {
+    const response = await fetch('http://localhost:8000/api/shifts');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.shifts || [];
+  } catch (error) {
+    console.error('Error fetching shifts:', error);
+    throw error;
+  }
+}
+
+// Update handleScheduleShift to make real API calls
+async function handleScheduleShift(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('shiftSuccessMsg');
+  const errorMsg = document.getElementById('shiftErrorMsg');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const shiftData = {
+    staff_id: parseInt(formData.get('staff_id')),
+    shift_type: formData.get('shift_type'),
+    shift_date: formData.get('shift_date')
+  };
+  
+  try {
+    const response = await fetch('http://localhost:8000/api/shifts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(shiftData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    await displayShifts();
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+    console.error('Error scheduling shift:', error);
+  }
+}
+
+// Update handleShiftDelete to use real API
+async function handleShiftDelete(e) {
+  const shiftId = e.target.getAttribute('data-shift-id');
+  if (!confirm('Are you sure you want to cancel this shift?')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`http://localhost:8000/api/shifts/${shiftId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    alert('Shift successfully cancelled!');
+    await displayShifts();
+  } catch (error) {
+    console.error('Error deleting shift:', error);
+    alert(`Error cancelling shift: ${error.message}`);
+  }
+}
   </script>
 </body>
 </html>
