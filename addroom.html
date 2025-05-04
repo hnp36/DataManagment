@@ -8,11 +8,14 @@
 </head>
 <body>
   <div class="container mt-5">
-    <h3 class="mb-4">Assign Room to Patient</h3>
+    <h3 class="mb-4">Manage Patient Room Assignment</h3>
 
     <form id="assignRoomForm">
       <div class="mb-3">
-        <input type="text" class="form-control" placeholder="Patient ID" name="patientId" required />
+        <select class="form-control" name="patientId" id="patientSelect" required>
+          <option value="">Select Patient</option>
+          <!-- Will be populated dynamically -->
+        </select>
       </div>
 
       <div class="mb-3">
@@ -33,7 +36,7 @@
       </div>
 
       <div class="mb-3">
-        <select class="form-control" name="roomNumber" required>
+        <select class="form-control" name="roomNumber" id="roomSelect" required>
           <option value="">Select Room</option>
           <option value="Blue-101">Blue Wing - Room 101</option>
           <option value="Blue-102">Blue Wing - Room 102</option>
@@ -43,7 +46,7 @@
       </div>
 
       <div class="mb-3">
-        <select class="form-control" name="bedNumber" required>
+        <select class="form-control" name="bedNumber" id="bedSelect" required>
           <option value="">Select Bed</option>
           <option value="A">Bed A</option>
           <option value="B">Bed B</option>
@@ -58,14 +61,17 @@
         <input type="text" class="form-control" placeholder="Assigned Nurse" name="assignedNurse" required />
       </div>
 
-      <button type="submit" class="btn btn-primary">Assign Room</button>
+      <div class="d-flex gap-2">
+        <button type="submit" class="btn btn-primary">Assign Room</button>
+        <button type="button" id="removeAssignmentBtn" class="btn btn-danger">Remove Assignment</button>
+      </div>
     </form>
 
     <div id="roomSuccessMsg" class="mt-3 text-success d-none">
-      Room successfully assigned!
+      Operation successful!
     </div>
     <div id="roomErrorMsg" class="mt-3 text-danger d-none">
-      Error assigning room. Please try again.
+      Error performing operation. Please try again.
     </div>
     <div id="loadingIndicator" class="mt-3 d-none">
       <div class="spinner-border text-primary" role="status">
@@ -83,12 +89,13 @@
           <thead>
             <tr>
               <th>ID</th>
-              <th>Patient ID</th>
+              <th>Patient</th>
               <th>Room</th>
               <th>Bed</th>
               <th>Admission Date</th>
               <th>Nursing Unit</th>
               <th>Assigned Nurse</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="roomsTableBody">
@@ -100,16 +107,124 @@
   </div>
 
   <script>
-    document.getElementById("assignRoomForm").addEventListener("submit", async function (e) {
-      e.preventDefault();
+    // Fetch patients from API and populate dropdown
+    async function loadPatients() {
+      const patientSelect = document.getElementById('patientSelect');
+      patientSelect.innerHTML = '<option value="">Select Patient</option>';
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/patients');
+        const data = await response.json();
+        
+        data.patients.forEach(patient => {
+          const option = document.createElement('option');
+          option.value = patient.id;
+          option.textContent = `${patient.first_name} ${patient.last_name} (ID: ${patient.id})`;
+          patientSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading patients:', error);
+      }
+    }
 
+    // Load room assignments
+    async function loadRoomAssignments() {
+      const tableBody = document.getElementById("roomsTableBody");
+      const roomsListDiv = document.getElementById("roomsList");
+
+      tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>Loading...</td></tr>";
+      roomsListDiv.style.display = "block";
+
+      try {
+        const [assignmentsRes, patientsRes] = await Promise.all([
+          fetch("http://localhost:8000/api/room-assignments"),
+          fetch("http://localhost:8000/api/patients")
+        ]);
+        
+        const assignmentsData = await assignmentsRes.json();
+        const patientsData = await patientsRes.json();
+        
+        const assignments = assignmentsData.assignments;
+        const patients = patientsData.patients;
+
+        if (assignments.length === 0) {
+          tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>No room assignments found</td></tr>";
+          return;
+        }
+
+        tableBody.innerHTML = "";
+        assignments.forEach(assignment => {
+          const patient = patients.find(p => p.id === assignment.patient_id);
+          const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown';
+          
+          const row = `
+            <tr>
+              <td>${assignment.id}</td>
+              <td>${patientName} (ID: ${assignment.patient_id})</td>
+              <td>${assignment.room_number}</td>
+              <td>${assignment.bed_number}</td>
+              <td>${new Date(assignment.admission_date).toLocaleDateString()}</td>
+              <td>${assignment.nursing_unit}</td>
+              <td>${assignment.assigned_nurse}</td>
+              <td>
+                <button class="btn btn-sm btn-danger remove-btn" data-id="${assignment.id}">Remove</button>
+              </td>
+            </tr>`;
+          tableBody.innerHTML += row;
+        });
+
+        // Add event listeners to remove buttons
+        document.querySelectorAll('.remove-btn').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            if (confirm('Are you sure you want to remove this assignment?')) {
+              try {
+                const response = await fetch(`http://localhost:8000/api/room-assignments/${this.dataset.id}`, {
+                  method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                  showMessage('Assignment removed successfully', true);
+                  loadRoomAssignments();
+                } else {
+                  throw new Error('Failed to remove assignment');
+                }
+              } catch (error) {
+                showMessage(error.message, false);
+              }
+            }
+          });
+        });
+      } catch (error) {
+        console.error("Error loading room assignments:", error);
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Failed to load room assignments.</td></tr>`;
+      }
+    }
+
+    // Show success/error message
+    function showMessage(message, isSuccess) {
       const loadingIndicator = document.getElementById("loadingIndicator");
       const errorMsg = document.getElementById("roomErrorMsg");
       const successMsg = document.getElementById("roomSuccessMsg");
 
+      loadingIndicator.classList.add("d-none");
+      
+      if (isSuccess) {
+        successMsg.textContent = message;
+        successMsg.classList.remove("d-none");
+        errorMsg.classList.add("d-none");
+      } else {
+        errorMsg.textContent = message;
+        errorMsg.classList.remove("d-none");
+        successMsg.classList.add("d-none");
+      }
+    }
+
+    // Form submission for assigning room
+    document.getElementById("assignRoomForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const loadingIndicator = document.getElementById("loadingIndicator");
       loadingIndicator.classList.remove("d-none");
-      errorMsg.classList.add("d-none");
-      successMsg.classList.add("d-none");
 
       const formData = new FormData(e.target);
       const roomData = {
@@ -132,51 +247,57 @@
         if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
 
         const data = await response.json();
-        loadingIndicator.classList.add("d-none");
-        successMsg.classList.remove("d-none");
+        showMessage('Room successfully assigned!', true);
         e.target.reset();
+        loadRoomAssignments();
       } catch (error) {
-        loadingIndicator.classList.add("d-none");
-        errorMsg.classList.remove("d-none");
-        errorMsg.textContent = `Error: ${error.message}`;
+        showMessage(`Error: ${error.message}`, false);
       }
     });
 
-    document.getElementById("viewRoomsBtn").addEventListener("click", async function () {
-      const tableBody = document.getElementById("roomsTableBody");
-      const roomsListDiv = document.getElementById("roomsList");
-
-      tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>Loading...</td></tr>";
-      roomsListDiv.style.display = "block";
-
-      try {
-        const response = await fetch("http://localhost:8000/api/room-assignments");
-        const data = await response.json();
-        const assignments = data.assignments;
-
-        if (assignments.length === 0) {
-          tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>No room assignments found</td></tr>";
-          return;
-        }
-
-        tableBody.innerHTML = "";
-        assignments.forEach(assignment => {
-          const row = `
-            <tr>
-              <td>${assignment.id}</td>
-              <td>${assignment.patient_id}</td>
-              <td>${assignment.room_number}</td>
-              <td>${assignment.bed_number}</td>
-              <td>${new Date(assignment.admission_date).toLocaleDateString()}</td>
-              <td>${assignment.nursing_unit}</td>
-              <td>${assignment.assigned_nurse}</td>
-            </tr>`;
-          tableBody.innerHTML += row;
-        });
-      } catch (error) {
-        console.error("Error loading room assignments:", error);
-        tableBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center">Failed to load room assignments.</td></tr>`;
+    // Remove assignment button
+    document.getElementById("removeAssignmentBtn").addEventListener("click", async function() {
+      const patientId = document.getElementById("patientSelect").value;
+      if (!patientId) {
+        showMessage('Please select a patient first', false);
+        return;
       }
+
+      if (confirm('Are you sure you want to remove this patient\'s room assignment?')) {
+        try {
+          const loadingIndicator = document.getElementById("loadingIndicator");
+          loadingIndicator.classList.remove("d-none");
+
+          // First find the assignment for this patient
+          const response = await fetch(`http://localhost:8000/api/room-assignments?patient_id=${patientId}`);
+          const data = await response.json();
+          
+          if (data.assignments.length === 0) {
+            throw new Error('No room assignment found for this patient');
+          }
+
+          // Delete the assignment
+          const deleteResponse = await fetch(`http://localhost:8000/api/room-assignments/${data.assignments[0].id}`, {
+            method: 'DELETE'
+          });
+          
+          if (!deleteResponse.ok) throw new Error('Failed to remove assignment');
+
+          showMessage('Room assignment removed successfully', true);
+          document.getElementById("assignRoomForm").reset();
+          loadRoomAssignments();
+        } catch (error) {
+          showMessage(error.message, false);
+        }
+      }
+    });
+
+    // View assignments button
+    document.getElementById("viewRoomsBtn").addEventListener("click", loadRoomAssignments);
+
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+      loadPatients();
     });
   </script>
 </body>
