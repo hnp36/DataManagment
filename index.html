@@ -35,134 +35,1065 @@
       <!-- Patient Management -->
       <div class="tab-pane fade show active" id="patient">
         <h3>Patient Management</h3>
+
+        <!-- Add New Patient -->
         <div class="mb-3">
-            <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
+          <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
         </div>
-        <div class="mb-3">
-          <h5>Appointments</h5>
+
+        <!-- Schedule Appointment -->
+        <div class="mb-4">
+          <h5>Schedule an Appointment</h5>
+          <form id="appointmentForm">
+            <div class="row g-2">
+              <div class="col-md-3">
+                <select class="form-control" name="patient_id" id="patientSelect" required>
+                  <option value="">Select Patient</option>
+                </select>
+              </div>
+              <div class="col-md-3">
+                <input type="text" class="form-control" name="doctor" placeholder="Doctor Name" required />
+              </div>
+              <div class="col-md-2">
+                <input type="date" class="form-control" name="appointment_date" required />
+              </div>
+              <div class="col-md-2">
+                <input type="time" class="form-control" name="appointment_time" required />
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-success w-100">Schedule</button>
+              </div>
+            </div>
+          </form>
+          <div id="appointmentSuccessMsg" class="mt-2 text-success d-none">Appointment scheduled!</div>
+          <div id="appointmentErrorMsg" class="mt-2 text-danger d-none">Error scheduling appointment.</div>
+        </div>
+
+        <!-- View Scheduled Appointments -->
+        <div class="mb-4">
+          <h5>Scheduled Appointments</h5>
+          <button id="refreshAppointmentsBtn" class="btn btn-outline-primary">Refresh Appointments</button>
           <table class="table table-bordered">
             <thead>
               <tr>
-                <th>Patient</th>
+                <th>ID</th>
+                <th>Patient Name</th>
                 <th>Doctor</th>
                 <th>Date</th>
                 <th>Time</th>
               </tr>
             </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center">No appointments scheduled</td></tr>
+            <tbody id="appointmentTableBody">
+              <tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>
             </tbody>
           </table>
         </div>
-        <div class="mb-3">
+
+        <!-- Check Previous Diagnoses -->
+        <div class="mb-4">
           <h5>Previous Diagnoses</h5>
-          <ul class="list-group">
+          <form id="diagnosisLookupForm" class="mb-3">
+            <div class="input-group">
+              <select class="form-control" id="patientSelectForDiagnosis">
+                <option value="">Select patient to view diagnoses</option>
+              </select>
+              <button type="submit" class="btn btn-outline-secondary">Search</button>
+            </div>
+          </form>
+          <ul class="list-group" id="diagnosisList">
             <li class="list-group-item">No records found</li>
           </ul>
         </div>
       </div>
-      
 
-      <!-- In-Patient Management -->
-      <div class="tab-pane fade" id="inpatient">
-        <h3>In-Patient Management</h3>
-        <div class="mb-3">
-            <button type="button" class="btn btn-outline-success">Assign Room</button>
+<!-- In-Patient Management -->
+<div class="tab-pane fade" id="inpatient">
+  <h3>In-Patient Management</h3>
+  <div class="mb-3">
+    <a href="addroom.html" class="btn btn-outline-primary">Assign Room</a>
+  </div>
+  
+  <!-- Room Assignments Section -->
+  <div class="mb-3">
+    <h5>Current Room Assignments</h5>
+    <button id="refreshRoomAssignmentsBtn" class="btn btn-outline-primary mb-2">Refresh Assignments</button>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>Assignment ID</th>
+          <th>Patient</th>
+          <th>Room Number</th>
+          <th>Assigned Date</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="roomAssignmentsTableBody">
+        <tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Procedure Scheduling Section -->
+  <div class="mb-3">
+    <h5>Schedule a Procedure</h5>
+    <form id="scheduleProcedureForm">
+      <div class="row g-2 mb-2">
+        <div class="col-md-4">
+          <select class="form-control" name="patient_id" id="procedurePatientSelect" required>
+            <option value="">Select Patient</option>
+          </select>
         </div>
-        <div class="mb-3">
-          <h5>Available Rooms</h5>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Room</th>
-                <th>Type</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="3" class="text-center">No rooms available</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <select class="form-control" name="staff_id" id="procedureStaffSelect" required>
+            <option value="">Select Doctor</option>
+          </select>
         </div>
-        <div class="mb-3">
-            <h5>Book a Surgery</h5>
-            <form id="bookSurgeryForm">
-              <div class="mb-2">
-                <input type="text" class="form-control" name="patient_id" placeholder="Patient ID" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="surgeon" placeholder="Surgeon Name" required />
-              </div>
-              <div class="mb-2">
-                <input type="text" class="form-control" name="room" placeholder="Room No." required />
-              </div>
-              <div class="mb-2">
-                <input type="date" class="form-control" name="date" required />
-              </div>
-              <button type="button" class="btn btn-outline-success">Book Surgery</button>
-
-            </form>
-            
-            <div id="surgerySuccessMsg" class="mt-3 text-success d-none">
-              Surgery successfully booked!
-            </div>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>Patient</th>
-                <th>Surgeon</th>
-                <th>Room</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="4" class="text-center">No surgeries scheduled</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <input type="text" class="form-control" name="room_number" placeholder="Room Number" required />
         </div>
       </div>
-
-      <!-- clinic Staff Management -->
-      <div class="tab-pane fade" id="staff">
-        <h3>Clinic Staff Management</h3>
-        <div class="mb-3">
-        <button type="button" class="btn btn-outline-info">Add Staff Member</button>
+      <div class="row g-2">
+        <div class="col-md-4">
+          <input type="date" class="form-control" name="procedure_date" required />
         </div>
-        <div class="mb-3">
-          <h5>Staff by Job Type</h5>
-          <table class="table table-striped">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Role</th>
-                <th>Department</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="3" class="text-center">No staff listed</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <input type="time" class="form-control" name="procedure_time" required />
         </div>
-        <div class="mb-3">
-          <h5>Scheduled Shifts</h5>
-          <table class="table table-striped">
-            <thead>
-              <tr>
-                <th>Staff</th>
-                <th>Shift</th>
-                <th>Date</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="3" class="text-center">No shifts scheduled</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-4">
+          <button type="submit" class="btn btn-success w-100">Schedule Procedure</button>
         </div>
       </div>
-
+    </form>
+    
+    <div id="procedureSuccessMsg" class="mt-3 alert alert-success d-none">
+      Procedure successfully scheduled!
+    </div>
+    <div id="procedureErrorMsg" class="mt-3 alert alert-danger d-none">
+      Error scheduling procedure.
     </div>
   </div>
+</div>
+  <!-- Staff Management -->
+<div class="tab-pane fade" id="staff">
+  <h3>Clinic Staff Management</h3>
+  
+  <!-- Action Buttons -->
+  <div class="mb-3">
+    <a href="addstaff.html" class="btn btn-outline-primary">Add New Staff</a>
+    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#removeStaffModal">
+      Remove Staff Member
+    </button>
+    <button id="viewAllStaffBtn" class="btn btn-outline-secondary">View All Staff</button>
+  </div>
+  
+  <!-- Filter Staff by Job Type -->
+  <div class="mb-4">
+    <h5>Staff by Job Type</h5>
+    <div class="row mb-2">
+      <div class="col-md-4">
+        <select class="form-select" id="jobTypeFilter">
+          <option value="all">All Job Types</option>
+          <option value="Physician">Physicians</option>
+          <option value="Nurse">Nurses</option>
+          <option value="Surgeon">Surgeons</option>
+          <option value="Support Staff">Support Staff</option>
+        </select>
+      </div>
+      <div class="col-md-4">
+        <button id="filterStaffBtn" class="btn btn-outline-primary">Filter</button>
+      </div>
+    </div>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Role</th>
+          <th>Department</th>
+          <th>Employment Type</th>
+          <th>Phone</th>
+        </tr>
+      </thead>
+      <tbody id="staffTableBody">
+        <tr><td colspan="6" class="text-center">No staff listed</td></tr>
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Schedule Shift Section -->
+  <div class="mb-4">
+    <h5>Schedule a Shift</h5>
+    <form id="scheduleShiftForm">
+      <div class="row g-2 mb-2">
+        <div class="col-md-3">
+          <select class="form-select" id="shiftStaffSelect" name="staff_id" required>
+            <option value="">Select Staff Member</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <select class="form-select" name="shift_type" required>
+            <option value="">Select Shift</option>
+            <option value="Morning">Morning (7AM-3PM)</option>
+            <option value="Afternoon">Afternoon (3PM-11PM)</option>
+            <option value="Night">Night (11PM-7AM)</option>
+          </select>
+        </div>
+        <div class="col-md-3">
+          <input type="date" class="form-control" name="shift_date" required min="<?php echo date('Y-m-d'); ?>">
+        </div>
+        <div class="col-md-3">
+          <button type="submit" class="btn btn-success">Schedule Shift</button>
+        </div>
+      </div>
+    </form>
+    <div id="shiftSuccessMsg" class="alert alert-success mt-2 d-none">Shift scheduled successfully!</div>
+    <div id="shiftErrorMsg" class="alert alert-danger mt-2 d-none">Error scheduling shift.</div>
+  </div>
+  
+  <!-- Scheduled Shifts View -->
+  <div class="mb-3">
+    <h5>Scheduled Shifts</h5>
+    <button id="refreshShiftsBtn" class="btn btn-outline-primary mb-2">Refresh Shifts</button>
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th>Role</th>
+          <th>Shift</th>
+          <th>Date</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="shiftsTableBody">
+        <tr><td colspan="5" class="text-center">No shifts scheduled</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
 
+<!-- Remove Staff Modal -->
+<div class="modal fade" id="removeStaffModal" tabindex="-1" aria-labelledby="removeStaffModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="removeStaffModalLabel">Remove Staff Member</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <form id="removeStaffForm">
+          <div class="mb-3">
+            <label for="staffToRemove" class="form-label">Select Staff Member</label>
+            <select class="form-select" id="staffToRemove" name="staff_id" required>
+              <option value="">Select Staff Member to Remove</option>
+            </select>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="confirmRemoval" required>
+            <label class="form-check-label" for="confirmRemoval">
+              I confirm that I want to remove this staff member
+            </label>
+          </div>
+          <button type="submit" class="btn btn-danger">Remove Staff Member</button>
+        </form>
+        <div id="removeSuccessMsg" class="alert alert-success mt-3 d-none">Staff member successfully removed.</div>
+        <div id="removeErrorMsg" class="alert alert-danger mt-3 d-none">Error removing staff member.</div>
+      </div>
+    </div>
+  </div>
+</div>
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  
+  <script>
+    // Store patients data globally for reference
+    let patientsData = [];
+
+    // Format time from seconds or HH:MM:SS to readable format
+    function formatTime(timeString) {
+      // Check if the time is in seconds format (like 51900)
+      if (!isNaN(timeString) && String(timeString).length <= 5) {
+        // Convert seconds to HH:MM:SS
+        const hours = Math.floor(timeString / 3600);
+        const minutes = Math.floor((timeString % 3600) / 60);
+        const seconds = timeString % 60;
+        return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      } 
+      
+      // If it's already in HH:MM:SS format or contains colons
+      if (timeString.includes(':')) {
+        // Just ensure it has seconds if it's HH:MM format
+        const parts = timeString.split(':');
+        if (parts.length === 2) {
+          return `${parts[0]}:${parts[1]}:00`;
+        }
+        return timeString;
+      }
+      
+      // For any other format, return as is
+      return timeString;
+    }
+
+    // Format date from YYYY-MM-DD to DD/MM/YYYY for display
+    function formatDate(dateString) {
+      if (!dateString) return '';
+      
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return as is if invalid
+      
+      return date.toLocaleDateString('en-GB'); // Format as DD/MM/YYYY
+    }
+
+    // Get patient name by ID
+    function getPatientNameById(patientId) {
+      const patient = patientsData.find(p => p.id === parseInt(patientId));
+      return patient ? patient.name : `Unknown (ID: ${patientId})`;
+    }
+
+    // Fetch patient list for dropdowns
+    async function fetchPatients() {
+      try {
+        const response = await fetch('http://localhost:8000/api/patients');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        patientsData = data.patients; // Store for later reference
+        return data.patients;
+      } catch (error) {
+        console.error('Error fetching patients:', error);
+        throw error;
+      }
+    }
+
+    // Populate patient dropdowns
+    async function populatePatientDropdowns() {
+      try {
+        const patients = await fetchPatients();
+        const patientSelect = document.getElementById('patientSelect');
+        const patientSelectForDiagnosis = document.getElementById('patientSelectForDiagnosis');
+        
+        // Clear existing options except the first one
+        patientSelect.innerHTML = '<option value="">Select Patient</option>';
+        patientSelectForDiagnosis.innerHTML = '<option value="">Select patient to view diagnoses</option>';
+        
+        // Add patient options
+        patients.forEach(patient => {
+          const option1 = document.createElement('option');
+          option1.value = patient.id;
+          option1.textContent = `${patient.name} (ID: ${patient.id})`;
+          patientSelect.appendChild(option1);
+          
+          const option2 = document.createElement('option');
+          option2.value = patient.id;
+          option2.textContent = `${patient.name} (ID: ${patient.id})`;
+          patientSelectForDiagnosis.appendChild(option2);
+        });
+      } catch (error) {
+        alert('Failed to fetch patient list. Please check if the server is running.');
+      }
+    }
+
+    // Fetch appointments
+    async function fetchAppointments() {
+      try {
+        const response = await fetch('http://localhost:8000/api/appointments');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.appointments;
+      } catch (error) {
+        console.error('Error fetching appointments:', error);
+        throw error;
+      }
+    }
+
+    // Display appointments in table
+    async function displayAppointments() {
+      const tableBody = document.getElementById('appointmentTableBody');
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
+      
+      try {
+        const appointments = await fetchAppointments();
+        
+        if (appointments.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>';
+          return;
+        }
+        
+        tableBody.innerHTML = '';
+        appointments.forEach(appointment => {
+          const patientName = getPatientNameById(appointment.patient_id);
+          const formattedTime = formatTime(appointment.appointment_time);
+          const formattedDate = formatDate(appointment.appointment_date);
+          
+          const row = `
+            <tr>
+              <td>${appointment.id}</td>
+              <td>${patientName}</td>
+              <td>${appointment.doctor}</td>
+              <td>${formattedDate}</td>
+              <td>${formattedTime}</td>
+            </tr>
+          `;
+          tableBody.innerHTML += row;
+        });
+      } catch (error) {
+        tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load appointments</td></tr>';
+      }
+    }
+
+    // Handle appointment form submission
+    document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const successMsg = document.getElementById('appointmentSuccessMsg');
+      const errorMsg = document.getElementById('appointmentErrorMsg');
+      
+      successMsg.classList.add('d-none');
+      errorMsg.classList.add('d-none');
+      
+      const formData = new FormData(e.target);
+      const appointmentData = {
+        patient_id: parseInt(formData.get('patient_id')),
+        doctor: formData.get('doctor'),
+        appointment_date: formData.get('appointment_date'),
+        appointment_time: formData.get('appointment_time')
+      };
+      
+      try {
+        const response = await fetch('http://localhost:8000/api/appointments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(appointmentData)
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        successMsg.classList.remove('d-none');
+        e.target.reset();
+        
+        // Refresh the appointments table
+        await displayAppointments();
+      } catch (error) {
+        errorMsg.classList.remove('d-none');
+        errorMsg.textContent = `Error: ${error.message}. Is the server running?`;
+      }
+    });
+
+    // Handle diagnosis lookup form submission
+    document.getElementById('diagnosisLookupForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      
+      const patientId = document.getElementById('patientSelectForDiagnosis').value;
+      if (!patientId) {
+        alert('Please select a patient');
+        return;
+      }
+      
+      const diagnosisList = document.getElementById('diagnosisList');
+      diagnosisList.innerHTML = '<li class="list-group-item">Loading...</li>';
+      
+      try {
+        const response = await fetch(`http://localhost:8000/api/diagnoses/${patientId}`);
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        const diagnoses = data.diagnoses;
+        
+        if (diagnoses.length === 0) {
+          diagnosisList.innerHTML = '<li class="list-group-item">No diagnoses found for this patient</li>';
+          return;
+        }
+        
+        diagnosisList.innerHTML = '';
+        diagnoses.forEach(diagnosis => {
+          const formattedDate = formatDate(diagnosis.diagnosis_date);
+          const item = `
+            <li class="list-group-item">
+              <strong>Date:</strong> ${formattedDate} 
+              <br>
+              <strong>Diagnosis:</strong> ${diagnosis.diagnosis}
+            </li>
+          `;
+          diagnosisList.innerHTML += item;
+        });
+      } catch (error) {
+        diagnosisList.innerHTML = `<li class="list-group-item text-danger">Failed to load diagnoses: ${error.message}</li>`;
+      }
+    });
+
+    // Refresh appointments button
+    document.getElementById('refreshAppointmentsBtn').addEventListener('click', displayAppointments);
+
+    // Initialize page: populate dropdowns and load appointments
+    document.addEventListener('DOMContentLoaded', function() {
+      populatePatientDropdowns();
+      displayAppointments();
+    });
+// Fetch and display room assignments
+async function fetchRoomAssignments() {
+  try {
+    const response = await fetch('http://localhost:8000/api/room-assignments');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.assignments || [];
+  } catch (error) {
+    console.error('Error fetching room assignments:', error);
+    throw error;
+  }
+}
+
+async function displayRoomAssignments() {
+  const tableBody = document.getElementById('roomAssignmentsTableBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>';
+  
+  try {
+    const assignments = await fetchRoomAssignments();
+    const patients = await fetchPatients();
+    
+    if (assignments.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No room assignments found</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    assignments.forEach(assignment => {
+      const patient = patients.find(p => p.id === assignment.patient_id);
+      const patientName = patient ? patient.name : `Patient ID: ${assignment.patient_id}`;
+      const formattedDate = formatDate(assignment.assignment_date);
+      
+      const row = `
+        <tr>
+          <td>${assignment.id}</td>
+          <td>${patientName}</td>
+          <td>${assignment.room_number}</td>
+          <td>${formattedDate}</td>
+          <td>${assignment.status || 'active'}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load room assignments</td></tr>';
+  }
+}
+
+// Populate patient dropdown for procedure scheduling
+async function populateProcedurePatientDropdown() {
+  try {
+    const patients = await fetchPatients();
+    const patientSelect = document.getElementById('procedurePatientSelect');
+    
+    // Clear existing options except the first one
+    patientSelect.innerHTML = '<option value="">Select Patient</option>';
+    
+    // Add patient options
+    patients.forEach(patient => {
+      const option = document.createElement('option');
+      option.value = patient.id;
+      option.textContent = `${patient.name} (ID: ${patient.id})`;
+      patientSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating patient dropdown:', error);
+  }
+}
+
+// Populate staff dropdown for procedure scheduling
+async function populateProcedureStaffDropdown() {
+  try {
+    const response = await fetch('http://localhost:8000/api/staff');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    const staff = data.staff || [];
+    
+    const staffSelect = document.getElementById('procedureStaffSelect');
+    staffSelect.innerHTML = '<option value="">Select Doctor</option>';
+    
+    staff.forEach(person => {
+      const option = document.createElement('option');
+      option.value = person.id;
+      option.textContent = `${person.name} (${person.role || 'Staff'})`;
+      staffSelect.appendChild(option);
+    });
+  } catch (error) {
+    console.error('Error populating staff dropdown:', error);
+  }
+}
+
+// Handle procedure scheduling form submission
+document.getElementById('scheduleProcedureForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('procedureSuccessMsg');
+  const errorMsg = document.getElementById('procedureErrorMsg');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const procedureData = {
+    patient_id: parseInt(formData.get('patient_id')),
+    staff_id: parseInt(formData.get('staff_id')),
+    room_number: formData.get('room_number'),
+    procedure_date: formData.get('procedure_date'),
+    procedure_time: formData.get('procedure_time')
+  };
+  
+  try {
+    // Since we don't have a procedures endpoint, we'll simulate the response
+    console.log('Procedure data to be sent:', procedureData);
+    
+    // Simulate success response
+    successMsg.classList.remove('d-none');
+    successMsg.textContent = 'Procedure scheduling simulated (endpoint not implemented)';
+    e.target.reset();
+    
+    // In a real implementation, you would:
+    // 1. Create a /api/procedures endpoint on your backend
+    // 2. Send the data to that endpoint
+    // 3. Handle the response appropriately
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+    console.error('Error scheduling procedure:', error);
+  }
+});
+
+// Initialize in-patient management tab when it's shown
+document.querySelector('a[href="#inpatient"]').addEventListener('shown.bs.tab', function() {
+  displayRoomAssignments();
+  populateProcedurePatientDropdown();
+  populateProcedureStaffDropdown();
+});
+
+// Refresh button for room assignments
+document.getElementById('refreshRoomAssignmentsBtn').addEventListener('click', displayRoomAssignments);
+
+// Global variables to store staff data
+let staffData = [];
+
+// Fetch all staff members
+async function fetchStaff() {
+  try {
+    const response = await fetch('http://localhost:8000/api/staff');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    staffData = data.staff || []; // Store for later reference
+    return staffData;
+  } catch (error) {
+    console.error('Error fetching staff:', error);
+    throw error;
+  }
+}
+
+// Populate staff table based on filter
+async function displayStaffByJobType(jobType = 'all') {
+  const tableBody = document.getElementById('staffTableBody');
+  tableBody.innerHTML = '<tr><td colspan="6" class="text-center">Loading...</td></tr>';
+  
+  try {
+    const staff = await fetchStaff();
+    
+    if (staff.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="6" class="text-center">No staff members found</td></tr>';
+      return;
+    }
+    
+    // Filter staff by job type if specified
+    const filteredStaff = jobType === 'all' 
+      ? staff 
+      : staff.filter(member => member.role === jobType);
+    
+    if (filteredStaff.length === 0) {
+      tableBody.innerHTML = `<tr><td colspan="6" class="text-center">No staff members found with role: ${jobType}</td></tr>`;
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    filteredStaff.forEach(member => {
+      const row = `
+        <tr>
+          <td>${member.id}</td>
+          <td>${member.first_name} ${member.last_name}</td>
+          <td>${member.role || 'N/A'}</td>
+          <td>${member.department || 'General'}</td>
+          <td>${member.emp_type || 'N/A'}</td>
+          <td>${member.phone}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load staff data</td></tr>';
+  }
+}
+
+// Populate staff dropdowns
+async function populateStaffDropdowns() {
+  try {
+    const staff = await fetchStaff();
+    
+    const shiftStaffSelect = document.getElementById('shiftStaffSelect');
+    const staffToRemove = document.getElementById('staffToRemove');
+    
+    // Clear existing options
+    shiftStaffSelect.innerHTML = '<option value="">Select Staff Member</option>';
+    staffToRemove.innerHTML = '<option value="">Select Staff Member to Remove</option>';
+    
+    staff.forEach(member => {
+      // Add option to shift scheduling dropdown
+      const option1 = document.createElement('option');
+      option1.value = member.id;
+      option1.textContent = `${member.first_name} ${member.last_name} (${member.role || 'Staff'})`;
+      shiftStaffSelect.appendChild(option1);
+      
+      // Add option to remove staff dropdown
+      const option2 = document.createElement('option');
+      option2.value = member.id;
+      option2.textContent = `${member.first_name} ${member.last_name} (${member.role || 'Staff'})`;
+      staffToRemove.appendChild(option2);
+    });
+  } catch (error) {
+    console.error('Error populating staff dropdowns:', error);
+  }
+}
+
+// Fetch all scheduled shifts
+async function fetchShifts() {
+  try {
+    // In a real implementation, you would fetch from an API endpoint
+    // For now, we'll create a mock response
+    // Replace this with actual API call when backend is ready
+    return [
+      { id: 1, staff_id: 1, staff_name: "John Doe", role: "Physician", shift_type: "Morning", shift_date: "2025-05-05" },
+      { id: 2, staff_id: 2, staff_name: "Jane Smith", role: "Nurse", shift_type: "Afternoon", shift_date: "2025-05-05" },
+      { id: 3, staff_id: 3, staff_name: "Robert Johnson", role: "Surgeon", shift_type: "Night", shift_date: "2025-05-06" }
+    ];
+    
+    // When you have the actual API, use code like this:
+    /*
+    const response = await fetch('http://localhost:8000/api/shifts');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.shifts || [];
+    */
+  } catch (error) {
+    console.error('Error fetching shifts:', error);
+    throw error;
+  }
+}
+
+async function displayShifts() {
+  const tableBody = document.getElementById('shiftsTableBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading shifts...</td></tr>';
+  
+  try {
+    const shifts = await fetchShifts();
+    
+    if (shifts.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No shifts scheduled</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    shifts.forEach(shift => {
+      const row = `
+        <tr>
+          <td>${shift.staff_name || 'Unknown'}</td>
+          <td>${shift.role || 'N/A'}</td>
+          <td>${shift.shift_type || 'N/A'}</td>
+          <td>${shift.formatted_date || shift.shift_date || 'N/A'}</td>
+          <td>
+            <button class="btn btn-sm btn-danger delete-shift" data-shift-id="${shift.id}">
+              Cancel Shift
+            </button>
+          </td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+    
+    // Add event listeners to delete buttons
+    document.querySelectorAll('.delete-shift').forEach(button => {
+      button.addEventListener('click', handleShiftDelete);
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load shifts</td></tr>';
+    console.error('Error loading shifts:', error);
+  }
+}
+
+// Handle shift deletion
+async function handleShiftDelete(e) {
+  const shiftId = e.target.getAttribute('data-shift-id');
+  if (!confirm('Are you sure you want to cancel this shift?')) {
+    return;
+  }
+  
+  try {
+    // In a real implementation, you would send a DELETE request to your API
+    // For now, just simulate successful deletion
+    console.log(`Deleting shift with ID: ${shiftId}`);
+    alert('Shift successfully cancelled!');
+    
+    // Refresh the shifts table
+    await displayShifts();
+    
+    // When you have the actual API, use code like this:
+    /*
+    const response = await fetch(`http://localhost:8000/api/shifts/${shiftId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Refresh the shifts table
+    await displayShifts();
+    */
+  } catch (error) {
+    console.error('Error deleting shift:', error);
+    alert(`Error cancelling shift: ${error.message}`);
+  }
+}
+
+// Handle schedule shift form submission
+async function handleScheduleShift(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('shiftSuccessMsg');
+  const errorMsg = document.getElementById('shiftErrorMsg');
+  
+  // Hide any existing messages
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const shiftData = {
+    staff_id: parseInt(formData.get('staff_id')),
+    shift_type: formData.get('shift_type'),
+    shift_date: formData.get('shift_date')
+  };
+  
+  try {
+    // In a real implementation, you would send data to your API
+    // For now, just simulate successful creation
+    console.log('Shift data to be sent:', shiftData);
+    
+    // Show success message
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    
+    // Refresh the shifts table
+    await displayShifts();
+    
+    // When you have the actual API, use code like this:
+    /*
+    const response = await fetch('http://localhost:8000/api/shifts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(shiftData)
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    
+    // Refresh the shifts table
+    await displayShifts();
+    */
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+    console.error('Error scheduling shift:', error);
+  }
+}
+
+// Handle remove staff form submission
+async function handleRemoveStaff(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('removeSuccessMsg');
+  const errorMsg = document.getElementById('removeErrorMsg');
+  
+  // Hide any existing messages
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const staffId = document.getElementById('staffToRemove').value;
+  
+  if (!staffId) {
+    errorMsg.textContent = 'Please select a staff member';
+    errorMsg.classList.remove('d-none');
+    return;
+  }
+  
+  try {
+    // Actual API call to remove staff
+    const response = await fetch(`http://localhost:8000/api/staff/${staffId}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    // Show success message
+    successMsg.textContent = 'Staff member successfully removed';
+    successMsg.classList.remove('d-none');
+    
+    // Reset form
+    e.target.reset();
+    document.getElementById('confirmRemoval').checked = false;
+    
+    // Close the modal after a short delay
+    setTimeout(() => {
+      const modal = bootstrap.Modal.getInstance(document.getElementById('removeStaffModal'));
+      modal.hide();
+    }, 1500);
+    
+    // Refresh the staff table and dropdowns
+    await displayStaffByJobType();
+    await populateStaffDropdowns();
+    
+  } catch (error) {
+    errorMsg.textContent = `Error: ${error.message}`;
+    errorMsg.classList.remove('d-none');
+    console.error('Error removing staff:', error);
+  }
+}
+
+// Set up event listeners
+function setupEventListeners() {
+  // Filter staff by job type
+  document.getElementById('filterStaffBtn').addEventListener('click', () => {
+    const jobType = document.getElementById('jobTypeFilter').value;
+    displayStaffByJobType(jobType);
+  });
+  
+  // View all staff
+  document.getElementById('viewAllStaffBtn').addEventListener('click', () => {
+    displayStaffByJobType('all');
+  });
+  
+  // Refresh shifts
+  document.getElementById('refreshShiftsBtn').addEventListener('click', displayShifts);
+  
+  // Schedule shift form submission
+  document.getElementById('scheduleShiftForm').addEventListener('submit', handleScheduleShift);
+  
+  // Remove staff form submission
+  document.getElementById('removeStaffForm').addEventListener('submit', handleRemoveStaff);
+}
+
+// Initialize staff management when tab is shown
+document.querySelector('a[href="#staff"]').addEventListener('shown.bs.tab', function() {
+  displayStaffByJobType('all');
+  populateStaffDropdowns();
+  displayShifts();
+  setupEventListeners();
+});
+
+// Replace the mock fetchShifts function with:
+async function fetchShifts() {
+  try {
+    const response = await fetch('http://localhost:8000/api/shifts');
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json();
+    return data.shifts || [];
+  } catch (error) {
+    console.error('Error fetching shifts:', error);
+    throw error;
+  }
+}
+
+// Update handleScheduleShift to make real API calls
+async function handleScheduleShift(e) {
+  e.preventDefault();
+  
+  const successMsg = document.getElementById('shiftSuccessMsg');
+  const errorMsg = document.getElementById('shiftErrorMsg');
+  
+  successMsg.classList.add('d-none');
+  errorMsg.classList.add('d-none');
+  
+  const formData = new FormData(e.target);
+  const shiftData = {
+    staff_id: parseInt(formData.get('staff_id')),
+    shift_type: formData.get('shift_type'),
+    shift_date: formData.get('shift_date')
+  };
+  
+  try {
+    const response = await fetch('http://localhost:8000/api/shifts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(shiftData)
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
+    }
+    
+    successMsg.classList.remove('d-none');
+    e.target.reset();
+    await displayShifts();
+  } catch (error) {
+    errorMsg.classList.remove('d-none');
+    errorMsg.textContent = `Error: ${error.message}`;
+    console.error('Error scheduling shift:', error);
+  }
+}
+
+// Update handleShiftDelete to use real API
+async function handleShiftDelete(e) {
+  const shiftId = e.target.getAttribute('data-shift-id');
+  if (!confirm('Are you sure you want to cancel this shift?')) {
+    return;
+  }
+  
+  try {
+    const response = await fetch(`http://localhost:8000/api/shifts/${shiftId}`, {
+      method: 'DELETE'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    alert('Shift successfully cancelled!');
+    await displayShifts();
+  } catch (error) {
+    console.error('Error deleting shift:', error);
+    alert(`Error cancelling shift: ${error.message}`);
+  }
+}
+  </script>
 </body>
 </html>
