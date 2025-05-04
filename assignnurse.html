@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assign Nurse to Patient</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="container mt-5">
+    <h3 class="mb-4">Assign Nurse to Patient</h3>
+
+    <form id="assignNurseForm">
+      <div class="mb-3">
+        <select class="form-control" name="patientId" id="patientSelect" required>
+          <option value="">Select Patient</option>
+          <!-- Will be populated dynamically -->
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <select class="form-control" name="nurseId" id="nurseSelect" required>
+          <option value="">Select Nurse</option>
+          <!-- Will be populated dynamically -->
+        </select>
+      </div>
+
+      <div class="mb-3">
+        <input type="date" class="form-control" name="assignmentDate" required />
+      </div>
+
+      <div class="mb-3">
+        <input type="text" class="form-control" placeholder="Shift (e.g., Day, Night)" name="shift" required />
+      </div>
+
+      <div class="mb-3">
+        <input type="text" class="form-control" placeholder="Responsibilities" name="responsibilities" required />
+      </div>
+
+      <button type="submit" class="btn btn-primary">Assign Nurse</button>
+    </form>
+
+    <div id="nurseSuccessMsg" class="mt-3 text-success d-none">
+      Nurse successfully assigned!
+    </div>
+    <div id="nurseErrorMsg" class="mt-3 text-danger d-none">
+      Error assigning nurse. Please try again.
+    </div>
+    <div id="loadingIndicator" class="mt-3 d-none">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+      <span class="ms-2">Processing...</span>
+    </div>
+
+    <!-- View Nurse Assignments Section -->
+    <div class="mt-5">
+      <h4>Nurse Assignments</h4>
+      <button id="viewAssignmentsBtn" class="btn btn-outline-primary">View Assignments</button>
+      <div id="assignmentsList" style="display:none;">
+        <table class="table table-striped">
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Patient</th>
+              <th>Nurse</th>
+              <th>Assignment Date</th>
+              <th>Shift</th>
+              <th>Responsibilities</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="assignmentsTableBody">
+            <!-- Dynamic content -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Fetch patients and nurses when page loads
+    document.addEventListener('DOMContentLoaded', async function() {
+      await loadPatients();
+      await loadNurses();
+    });
+
+    // Load patients from API
+    async function loadPatients() {
+      const patientSelect = document.getElementById('patientSelect');
+      try {
+        const response = await fetch('http://localhost:8000/api/patients');
+        const data = await response.json();
+        
+        patientSelect.innerHTML = '<option value="">Select Patient</option>';
+        data.patients.forEach(patient => {
+          const option = document.createElement('option');
+          option.value = patient.id;
+          option.textContent = `${patient.name} (ID: ${patient.id})`;
+          patientSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading patients:', error);
+        showMessage(`Error loading patients: ${error.message}`, false);
+      }
+    }
+
+    // Load nurses from API - updated version
+    async function loadNurses() {
+      const nurseSelect = document.getElementById('nurseSelect');
+      try {
+        // Use the new /api/nurses endpoint if available
+        const response = await fetch('http://localhost:8000/api/nurses');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        
+        nurseSelect.innerHTML = '<option value="">Select Nurse</option>';
+        data.nurses.forEach(nurse => {
+          const option = document.createElement('option');
+          option.value = nurse.id;
+          option.textContent = `${nurse.first_name} ${nurse.last_name} (ID: ${nurse.employment_no})`;
+          nurseSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading nurses:', error);
+        showMessage(`Error loading nurses: ${error.message}`, false);
+        
+        // Fallback to filtering all staff if /api/nurses endpoint doesn't exist
+        try {
+          const allStaffResponse = await fetch('http://localhost:8000/api/staff');
+          const allStaffData = await allStaffResponse.json();
+          
+          nurseSelect.innerHTML = '<option value="">Select Nurse</option>';
+          allStaffData.staff
+            .filter(staff => staff.role === 'Nurse')
+            .forEach(nurse => {
+              const option = document.createElement('option');
+              option.value = nurse.id;
+              option.textContent = `${nurse.first_name} ${nurse.last_name} (ID: ${nurse.employment_no})`;
+              nurseSelect.appendChild(option);
+            });
+        } catch (fallbackError) {
+          console.error('Fallback nurse loading failed:', fallbackError);
+        }
+      }
+    }
+
+    // Form submission for assigning nurse
+    document.getElementById("assignNurseForm").addEventListener("submit", async function (e) {
+      e.preventDefault();
+
+      const loadingIndicator = document.getElementById("loadingIndicator");
+      const errorMsg = document.getElementById("nurseErrorMsg");
+      const successMsg = document.getElementById("nurseSuccessMsg");
+
+      loadingIndicator.classList.remove("d-none");
+      errorMsg.classList.add("d-none");
+      successMsg.classList.add("d-none");
+
+      const formData = new FormData(e.target);
+      const assignmentData = {
+        patient_id: parseInt(formData.get("patientId")),
+        nurse_id: parseInt(formData.get("nurseId")),
+        assignment_date: formData.get("assignmentDate"),
+        shift: formData.get("shift"),
+        responsibilities: formData.get("responsibilities")
+      };
+
+      try {
+        const response = await fetch('http://localhost:8000/api/nurse-assignments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(assignmentData)
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        showMessage('Nurse assigned successfully!', true);
+        e.target.reset();
+        loadAssignments(); // Refresh the assignments list
+      } catch (error) {
+        showMessage(`Error: ${error.message}`, false);
+      } finally {
+        loadingIndicator.classList.add("d-none");
+      }
+    });
+
+    // Load nurse assignments
+    async function loadAssignments() {
+      const tableBody = document.getElementById("assignmentsTableBody");
+      const assignmentsListDiv = document.getElementById("assignmentsList");
+
+      tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>Loading...</td></tr>";
+      assignmentsListDiv.style.display = "block";
+
+      try {
+        const response = await fetch("http://localhost:8000/api/nurse-assignments");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        const assignments = data.assignments;
+
+        if (assignments.length === 0) {
+          tableBody.innerHTML = "<tr><td colspan='7' class='text-center'>No nurse assignments found</td></tr>";
+          return;
+        }
+
+        tableBody.innerHTML = "";
+        assignments.forEach(assignment => {
+          const row = `
+            <tr>
+              <td>${assignment.id}</td>
+              <td>${assignment.patient_name} (ID: ${assignment.patient_id})</td>
+              <td>${assignment.nurse_name} (ID: ${assignment.nurse_id})</td>
+              <td>${new Date(assignment.assignment_date).toLocaleDateString()}</td>
+              <td>${assignment.shift}</td>
+              <td>${assignment.responsibilities}</td>
+              <td>
+                <button class="btn btn-sm btn-danger remove-btn" data-id="${assignment.id}">Remove</button>
+              </td>
+            </tr>`;
+          tableBody.innerHTML += row;
+        });
+
+        // Add event listeners to remove buttons
+        document.querySelectorAll('.remove-btn').forEach(btn => {
+          btn.addEventListener('click', async function() {
+            if (confirm('Are you sure you want to remove this assignment?')) {
+              try {
+                const loadingIndicator = document.getElementById("loadingIndicator");
+                loadingIndicator.classList.remove("d-none");
+                
+                const response = await fetch(`http://localhost:8000/api/nurse-assignments/${this.dataset.id}`, {
+                  method: 'DELETE'
+                });
+                
+                if (!response.ok) {
+                  const errorData = await response.json();
+                  throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+                }
+
+                showMessage('Assignment removed successfully', true);
+                loadAssignments();
+              } catch (error) {
+                showMessage(`Error: ${error.message}`, false);
+              } finally {
+                document.getElementById("loadingIndicator").classList.add("d-none");
+              }
+            }
+          });
+        });
+      } catch (error) {
+        console.error("Error loading assignments:", error);
+        tableBody.innerHTML = `<tr><td colspan="7" class="text-danger text-center">Failed to load assignments: ${error.message}</td></tr>`;
+      }
+    }
+
+    // View assignments button
+    document.getElementById("viewAssignmentsBtn").addEventListener("click", loadAssignments);
+
+    // Show success/error message
+    function showMessage(message, isSuccess) {
+      const errorMsg = document.getElementById("nurseErrorMsg");
+      const successMsg = document.getElementById("nurseSuccessMsg");
+      
+      if (isSuccess) {
+        successMsg.textContent = message;
+        successMsg.classList.remove("d-none");
+        errorMsg.classList.add("d-none");
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          successMsg.classList.add("d-none");
+        }, 3000);
+      } else {
+        errorMsg.textContent = message;
+        errorMsg.classList.remove("d-none");
+        successMsg.classList.add("d-none");
+      }
+    }
+  </script>
+</body>
+</html>

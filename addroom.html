@@ -107,6 +107,11 @@
   </div>
 
   <script>
+    // Debug function to inspect API responses
+    function logApiResponse(name, data) {
+      console.log(`API Response (${name}):`, data);
+    }
+
     // Fetch patients from API and populate dropdown
     async function loadPatients() {
       const patientSelect = document.getElementById('patientSelect');
@@ -114,20 +119,32 @@
       
       try {
         const response = await fetch('http://localhost:8000/api/patients');
-        const data = await response.json();
+        if (!response.ok) throw new Error('Failed to fetch patients');
         
-        data.patients.forEach(patient => {
-          const option = document.createElement('option');
-          option.value = patient.id;
-          option.textContent = `${patient.first_name} ${patient.last_name} (ID: ${patient.id})`;
-          patientSelect.appendChild(option);
-        });
+        const data = await response.json();
+        logApiResponse('patients', data);
+        
+        // Handle different API response formats
+        const patients = data.patients || data.data || data || [];
+        
+        if (Array.isArray(patients)) {
+          patients.forEach(patient => {
+            const option = document.createElement('option');
+            option.value = patient.id;
+            option.textContent = `${patient.name || ''} (ID: ${patient.id})`;
+            patientSelect.appendChild(option);
+          });
+        } else {
+          console.error('Invalid patients data format:', data);
+          throw new Error('Invalid patients data format');
+        }
       } catch (error) {
         console.error('Error loading patients:', error);
+        showMessage(`Error loading patients: ${error.message}`, false);
       }
     }
 
-    // Load room assignments
+    // Load room assignments with proper patient names
     async function loadRoomAssignments() {
       const tableBody = document.getElementById("roomsTableBody");
       const roomsListDiv = document.getElementById("roomsList");
@@ -136,16 +153,12 @@
       roomsListDiv.style.display = "block";
 
       try {
-        const [assignmentsRes, patientsRes] = await Promise.all([
-          fetch("http://localhost:8000/api/room-assignments"),
-          fetch("http://localhost:8000/api/patients")
-        ]);
+        const response = await fetch("http://localhost:8000/api/room-assignments");
+        if (!response.ok) throw new Error('Failed to fetch room assignments');
         
-        const assignmentsData = await assignmentsRes.json();
-        const patientsData = await patientsRes.json();
-        
-        const assignments = assignmentsData.assignments;
-        const patients = patientsData.patients;
+        const data = await response.json();
+        logApiResponse('room-assignments', data);
+        const assignments = data.assignments || [];
 
         if (assignments.length === 0) {
           tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>No room assignments found</td></tr>";
@@ -154,13 +167,10 @@
 
         tableBody.innerHTML = "";
         assignments.forEach(assignment => {
-          const patient = patients.find(p => p.id === assignment.patient_id);
-          const patientName = patient ? `${patient.first_name} ${patient.last_name}` : 'Unknown';
-          
           const row = `
             <tr>
               <td>${assignment.id}</td>
-              <td>${patientName} (ID: ${assignment.patient_id})</td>
+              <td>${assignment.patient_name || 'Unknown'} (ID: ${assignment.patient_id})</td>
               <td>${assignment.room_number}</td>
               <td>${assignment.bed_number}</td>
               <td>${new Date(assignment.admission_date).toLocaleDateString()}</td>
@@ -172,31 +182,54 @@
             </tr>`;
           tableBody.innerHTML += row;
         });
-
-        // Add event listeners to remove buttons
+        
+        // Add event listeners to remove buttons - FIXED HERE
         document.querySelectorAll('.remove-btn').forEach(btn => {
-          btn.addEventListener('click', async function() {
+          btn.addEventListener('click', function() {
+            const assignmentId = this.getAttribute('data-id');
+            console.log("Removing assignment ID:", assignmentId);
             if (confirm('Are you sure you want to remove this assignment?')) {
-              try {
-                const response = await fetch(`http://localhost:8000/api/room-assignments/${this.dataset.id}`, {
-                  method: 'DELETE'
-                });
-                
-                if (response.ok) {
-                  showMessage('Assignment removed successfully', true);
-                  loadRoomAssignments();
-                } else {
-                  throw new Error('Failed to remove assignment');
-                }
-              } catch (error) {
-                showMessage(error.message, false);
-              }
+              removeAssignment(assignmentId);
             }
           });
         });
       } catch (error) {
         console.error("Error loading room assignments:", error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Failed to load room assignments.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Failed to load room assignments: ${error.message}</td></tr>`;
+      }
+    }
+
+    // Function to handle assignment removal - UPDATED
+    async function removeAssignment(assignmentId) {
+      try {
+        const loadingIndicator = document.getElementById("loadingIndicator");
+        loadingIndicator.classList.remove("d-none");
+        
+        console.log(`Sending DELETE request to: http://localhost:8000/api/room-assignments/${assignmentId}`);
+        
+        const response = await fetch(`http://localhost:8000/api/room-assignments/${assignmentId}`, {
+          method: 'DELETE'
+        });
+        
+        if (!response.ok) {
+          const text = await response.text();
+          let errorMessage;
+          try {
+            const errorData = JSON.parse(text);
+            errorMessage = errorData.message || errorData.error || errorData.detail || `HTTP error! status: ${response.status}`;
+          } catch (e) {
+            errorMessage = `HTTP error! status: ${response.status}`;
+          }
+          throw new Error(errorMessage);
+        }
+        
+        showMessage('Assignment removed successfully', true);
+        loadRoomAssignments();
+      } catch (error) {
+        console.error('Error removing assignment:', error);
+        showMessage(`Error removing assignment: ${error.message}`, false);
+      } finally {
+        document.getElementById("loadingIndicator").classList.add("d-none");
       }
     }
 
@@ -212,6 +245,11 @@
         successMsg.textContent = message;
         successMsg.classList.remove("d-none");
         errorMsg.classList.add("d-none");
+        
+        // Hide success message after 3 seconds
+        setTimeout(() => {
+          successMsg.classList.add("d-none");
+        }, 3000);
       } else {
         errorMsg.textContent = message;
         errorMsg.classList.remove("d-none");
@@ -244,7 +282,10 @@
           body: JSON.stringify(roomData)
         });
 
-        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || errorData.detail || `HTTP error! status: ${response.status}`);
+        }
 
         const data = await response.json();
         showMessage('Room successfully assigned!', true);
@@ -252,10 +293,12 @@
         loadRoomAssignments();
       } catch (error) {
         showMessage(`Error: ${error.message}`, false);
+      } finally {
+        loadingIndicator.classList.add("d-none");
       }
     });
 
-    // Remove assignment button
+    // Remove assignment button for selected patient
     document.getElementById("removeAssignmentBtn").addEventListener("click", async function() {
       const patientId = document.getElementById("patientSelect").value;
       if (!patientId) {
@@ -270,24 +313,26 @@
 
           // First find the assignment for this patient
           const response = await fetch(`http://localhost:8000/api/room-assignments?patient_id=${patientId}`);
-          const data = await response.json();
           
-          if (data.assignments.length === 0) {
+          if (!response.ok) {
+            throw new Error('Failed to fetch assignments');
+          }
+          
+          const data = await response.json();
+          const assignments = data.assignments || [];
+          
+          if (assignments.length === 0) {
             throw new Error('No room assignment found for this patient');
           }
 
-          // Delete the assignment
-          const deleteResponse = await fetch(`http://localhost:8000/api/room-assignments/${data.assignments[0].id}`, {
-            method: 'DELETE'
-          });
-          
-          if (!deleteResponse.ok) throw new Error('Failed to remove assignment');
-
-          showMessage('Room assignment removed successfully', true);
+          // Use the assignment ID directly
+          await removeAssignment(assignments[0].id);
           document.getElementById("assignRoomForm").reset();
-          loadRoomAssignments();
+          
         } catch (error) {
           showMessage(error.message, false);
+        } finally {
+          loadingIndicator.classList.add("d-none");
         }
       }
     });

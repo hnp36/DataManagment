@@ -153,6 +153,35 @@ def create_tables():
                 logger.error(f"Error creating tables: {e}")
                 raise HTTPException(status_code=500, detail="Table creation failed")
 
+
+            # Doctor Assignments Table
+            cursor.execute('''
+    CREATE TABLE IF NOT EXISTS doctor_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        doctor_id INT NOT NULL,
+        assignment_date DATE NOT NULL,
+        reason TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patient_id) REFERENCES patients(id),
+        FOREIGN KEY (doctor_id) REFERENCES staff(id)
+    )
+''')
+            
+            # Nurse Assignments Table:
+            cursor.execute('''
+    CREATE TABLE IF NOT EXISTS nurse_assignments (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        patient_id INT NOT NULL,
+        nurse_id INT NOT NULL,
+        assignment_date DATE NOT NULL,
+        shift VARCHAR(20) NOT NULL,
+        responsibilities TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (patient_id) REFERENCES patients(id),
+        FOREIGN KEY (nurse_id) REFERENCES staff(id)
+    )
+''')
 # Models
 class Patient(BaseModel):
     name: str
@@ -200,6 +229,19 @@ class Shift(BaseModel):
     staff_id: int
     shift_type: str
     shift_date: str
+
+class DoctorAssignment(BaseModel):
+    patient_id: int
+    doctor_id: int
+    assignment_date: str
+    reason: str
+
+class NurseAssignment(BaseModel):
+    patient_id: int
+    nurse_id: int
+    assignment_date: str
+    shift: str
+    responsibilities: str
 
 # Startup event
 @app.on_event("startup")
@@ -389,15 +431,41 @@ async def assign_room(assignment: RoomAssignment):
                 raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/room-assignments")
-async def get_room_assignments():
+async def get_room_assignments(patient_id: Optional[int] = None):
     with get_db_connection() as connection:
         with get_db_cursor(connection) as cursor:
             try:
-                cursor.execute("SELECT * FROM room_assignments")
-                return {"assignments": cursor.fetchall()}
+                base_query = """
+                    SELECT 
+                        ra.id, ra.patient_id, ra.admission_date, 
+                        ra.nursing_unit, ra.room_number, ra.bed_number,
+                        ra.number_of_days, ra.assigned_nurse, ra.created_at,
+                        p.name as patient_name,
+                        DATE_FORMAT(ra.admission_date, '%%Y-%%m-%%d') as formatted_date
+                    FROM room_assignments ra
+                    JOIN patients p ON ra.patient_id = p.id
+                """
+                
+                query_parts = [base_query]
+                params = []
+                
+                if patient_id is not None:
+                    query_parts.append(" WHERE ra.patient_id = %s")
+                    params.append(patient_id)
+                
+                query_parts.append(" ORDER BY ra.admission_date DESC")
+                
+                final_query = "".join(query_parts)
+                cursor.execute(final_query, params)
+                
+                assignments = cursor.fetchall()
+                return {"assignments": assignments}
             except Error as e:
-                raise HTTPException(status_code=500, detail=str(e))
-
+                logger.error(f"Error fetching room assignments: {e}")
+                raise HTTPException(
+                    status_code=500, 
+                    detail="Failed to fetch room assignments. Please try again later."
+                )
 # Utility Routes
 @app.get("/api/patient-id")
 async def get_patient_id(name: str):
@@ -411,6 +479,31 @@ async def get_patient_id(name: str):
                 else:
                     raise HTTPException(status_code=404, detail="Patient not found")
             except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
+            
+#  endpoint for deleting room assignments
+@app.delete("/api/room-assignments/{assignment_id}")
+async def delete_room_assignment(assignment_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # First check if assignment exists
+                cursor.execute("SELECT id FROM room_assignments WHERE id = %s", (assignment_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Room assignment not found")
+                
+                # Delete the assignment
+                cursor.execute("DELETE FROM room_assignments WHERE id = %s", (assignment_id,))
+                connection.commit()
+                
+                # Check if deletion was successful
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=500, detail="Failed to delete room assignment")
+                    
+                return {"message": "Room assignment removed successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error deleting room assignment: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
 # Shifts Routes
@@ -469,3 +562,138 @@ async def delete_shift(shift_id: int):
                 connection.rollback()
                 logger.error(f"Error deleting shift: {e}")
                 raise HTTPException(status_code=500, detail="Failed to delete shift")
+
+@app.post("/api/doctor-assignments")
+async def assign_doctor(assignment: DoctorAssignment):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO doctor_assignments (
+                        patient_id, doctor_id, assignment_date, reason
+                    ) VALUES (%s, %s, %s, %s)
+                """, (
+                    assignment.patient_id, assignment.doctor_id, 
+                    assignment.assignment_date, assignment.reason
+                ))
+                connection.commit()
+                return {"message": "Doctor assigned successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/doctor-assignments")
+async def get_doctor_assignments():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    SELECT da.*, 
+                           p.name as patient_name,
+                           CONCAT(s.first_name, ' ', s.last_name) as doctor_name
+                    FROM doctor_assignments da
+                    JOIN patients p ON da.patient_id = p.id
+                    JOIN staff s ON da.doctor_id = s.id
+                    ORDER BY da.assignment_date DESC
+                """)
+                return {"assignments": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/doctor-assignments/{assignment_id}")
+async def delete_doctor_assignment(assignment_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("DELETE FROM doctor_assignments WHERE id = %s", (assignment_id,))
+                connection.commit()
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Assignment not found")
+                return {"message": "Assignment deleted successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
+            
+@app.post("/api/nurse-assignments")
+async def assign_nurse(assignment: NurseAssignment):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    INSERT INTO nurse_assignments (
+                        patient_id, nurse_id, assignment_date, shift, responsibilities
+                    ) VALUES (%s, %s, %s, %s, %s)
+                """, (
+                    assignment.patient_id, assignment.nurse_id, 
+                    assignment.assignment_date, assignment.shift,
+                    assignment.responsibilities
+                ))
+                connection.commit()
+                return {"message": "Nurse assigned successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/nurse-assignments")
+async def get_nurse_assignments():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    SELECT na.*, 
+                           p.name as patient_name,
+                           CONCAT(s.first_name, ' ', s.last_name) as nurse_name
+                    FROM nurse_assignments na
+                    JOIN patients p ON na.patient_id = p.id
+                    JOIN staff s ON na.nurse_id = s.id
+                    ORDER BY na.assignment_date DESC
+                """)
+                return {"assignments": cursor.fetchall()}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/nurse-assignments/{assignment_id}")
+async def delete_nurse_assignment(assignment_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("DELETE FROM nurse_assignments WHERE id = %s", (assignment_id,))
+                connection.commit()
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Assignment not found")
+                return {"message": "Assignment deleted successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                raise HTTPException(status_code=500, detail=str(e))
+# Nurse data
+@app.get("/api/nurses")
+async def get_nurses():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    SELECT id, first_name, last_name, employment_no
+                    FROM staff
+                    WHERE role = 'Nurse'
+                    ORDER BY last_name, first_name
+                """)
+                return {"nurses": cursor.fetchall()}
+            except Error as e:
+                logger.error(f"Error fetching nurses: {e}")
+                raise HTTPException(status_code=500, detail="Failed to fetch nurses")
+            
+@app.get("/api/doctors")
+async def get_doctors():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    SELECT id, first_name, last_name, role 
+                    FROM staff 
+                    WHERE role IN ('Physician', 'Surgeon')
+                    ORDER BY last_name, first_name
+                """)
+                return {"doctors": cursor.fetchall()}
+            except Error as e:
+                logger.error(f"Error fetching doctors: {e}")
+                raise HTTPException(status_code=500, detail="Failed to fetch doctors")

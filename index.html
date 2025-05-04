@@ -32,87 +32,90 @@
     <!-- Tab Content -->
     <div class="tab-content mt-4">
 
-      <!-- Patient Management -->
-      <div class="tab-pane fade show active" id="patient">
-        <h3>Patient Management</h3>
+<!-- Patient Management -->
+<div class="tab-pane fade show active" id="patient">
+  <h3>Patient Management</h3>
 
-        <!-- Add New Patient -->
-        <div class="mb-3">
-          <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
+  <!-- Add New Patient -->
+  <div class="mb-3">
+    <a href="newpatient.html" class="btn btn-outline-primary">Add New Patient</a>
+  </div>
+
+  <!-- Schedule Appointment -->
+  <div class="mb-4">
+    <h5>Schedule an Appointment</h5>
+    <form id="appointmentForm">
+      <div class="row g-2">
+        <div class="col-md-3">
+          <select class="form-control" name="patient_id" id="patientSelect" required>
+            <option value="">Select Patient</option>
+          </select>
         </div>
-
-        <!-- Schedule Appointment -->
-        <div class="mb-4">
-          <h5>Schedule an Appointment</h5>
-          <form id="appointmentForm">
-            <div class="row g-2">
-              <div class="col-md-3">
-                <select class="form-control" name="patient_id" id="patientSelect" required>
-                  <option value="">Select Patient</option>
-                </select>
-              </div>
-              <div class="col-md-3">
-                <input type="text" class="form-control" name="doctor" placeholder="Doctor Name" required />
-              </div>
-              <div class="col-md-2">
-                <input type="date" class="form-control" name="appointment_date" required />
-              </div>
-              <div class="col-md-2">
-                <input type="time" class="form-control" name="appointment_time" required />
-              </div>
-              <div class="col-md-2">
-                <button type="submit" class="btn btn-success w-100">Schedule</button>
-              </div>
-            </div>
-          </form>
-          <div id="appointmentSuccessMsg" class="mt-2 text-success d-none">Appointment scheduled!</div>
-          <div id="appointmentErrorMsg" class="mt-2 text-danger d-none">Error scheduling appointment.</div>
+        <div class="col-md-3">
+          <select class="form-control" name="doctor" id="doctorSelect" required>
+            <option value="">Select Doctor</option>
+          </select>
         </div>
-
-        <!-- View Scheduled Appointments -->
-        <div class="mb-4">
-          <h5>Scheduled Appointments</h5>
-          <button id="refreshAppointmentsBtn" class="btn btn-outline-primary">Refresh Appointments</button>
-          <table class="table table-bordered">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Patient Name</th>
-                <th>Doctor</th>
-                <th>Date</th>
-                <th>Time</th>
-              </tr>
-            </thead>
-            <tbody id="appointmentTableBody">
-              <tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>
-            </tbody>
-          </table>
+        <div class="col-md-2">
+          <input type="date" class="form-control" name="appointment_date" required />
         </div>
-
-        <!-- Check Previous Diagnoses -->
-        <div class="mb-4">
-          <h5>Previous Diagnoses</h5>
-          <form id="diagnosisLookupForm" class="mb-3">
-            <div class="input-group">
-              <select class="form-control" id="patientSelectForDiagnosis">
-                <option value="">Select patient to view diagnoses</option>
-              </select>
-              <button type="submit" class="btn btn-outline-secondary">Search</button>
-            </div>
-          </form>
-          <ul class="list-group" id="diagnosisList">
-            <li class="list-group-item">No records found</li>
-          </ul>
+        <div class="col-md-2">
+          <input type="time" class="form-control" name="appointment_time" required />
+        </div>
+        <div class="col-md-2">
+          <button type="submit" class="btn btn-success w-100">Schedule</button>
         </div>
       </div>
+    </form>
+    <div id="appointmentSuccessMsg" class="mt-2 text-success d-none">Appointment scheduled!</div>
+    <div id="appointmentErrorMsg" class="mt-2 text-danger d-none">Error scheduling appointment.</div>
+  </div>
 
+  <!-- View Scheduled Appointments -->
+  <div class="mb-4">
+    <h5>Scheduled Appointments</h5>
+    <button id="refreshAppointmentsBtn" class="btn btn-outline-primary">Refresh Appointments</button>
+    <table class="table table-bordered">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Patient Name</th>
+          <th>Doctor</th>
+          <th>Date</th>
+          <th>Time</th>
+        </tr>
+      </thead>
+      <tbody id="appointmentTableBody">
+        <tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Check Previous Diagnoses -->
+  <div class="mb-4">
+    <h5>Previous Diagnoses</h5>
+    <form id="diagnosisLookupForm" class="mb-3">
+      <div class="input-group">
+        <select class="form-control" id="patientSelectForDiagnosis">
+          <option value="">Select patient to view diagnoses</option>
+        </select>
+        <button type="submit" class="btn btn-outline-secondary">Search</button>
+      </div>
+    </form>
+    <ul class="list-group" id="diagnosisList">
+      <li class="list-group-item">No records found</li>
+    </ul>
+  </div>
+</div>
 <!-- In-Patient Management -->
 <div class="tab-pane fade" id="inpatient">
   <h3>In-Patient Management</h3>
-  <div class="mb-3">
+  <div class="mb-3 d-flex gap-2">
     <a href="addroom.html" class="btn btn-outline-primary">Assign Room</a>
+    <a href="assigndoctor.html" class="btn btn-outline-primary">Assign Doctor</a>
+    <a href="assignnurse.html" class="btn btn-outline-primary">Assign Nurse</a>
   </div>
-  
+
   <!-- Room Assignments Section -->
   <div class="mb-3">
     <h5>Current Room Assignments</h5>
@@ -132,7 +135,7 @@
       </tbody>
     </table>
   </div>
-  
+
   <!-- Procedure Scheduling Section -->
   <div class="mb-3">
     <h5>Schedule a Procedure</h5>
@@ -306,6 +309,8 @@
   <script>
     // Store patients data globally for reference
     let patientsData = [];
+    // Global variable to store doctors
+    let doctorsData = [];
 
     // Format time from seconds or HH:MM:SS to readable format
     function formatTime(timeString) {
@@ -392,6 +397,34 @@
       }
     }
 
+    // Function to load doctors
+    async function loadDoctors() {
+      try {
+        const response = await fetch('http://localhost:8000/api/doctors');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        doctorsData = data.doctors;
+        
+        const doctorSelect = document.getElementById('doctorSelect');
+        doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
+        
+        data.doctors.forEach(doctor => {
+          const option = document.createElement('option');
+          option.value = doctor.id;
+          option.textContent = `${doctor.first_name} ${doctor.last_name} (${doctor.role})`;
+          doctorSelect.appendChild(option);
+        });
+      } catch (error) {
+        console.error('Error loading doctors:', error);
+        // Fallback to text input if doctor fetch fails
+        document.getElementById('doctorSelect').outerHTML = `
+          <input type="text" class="form-control" name="doctor" placeholder="Doctor Name" required />
+        `;
+      }
+    }
+
     // Fetch appointments
     async function fetchAppointments() {
       try {
@@ -442,7 +475,7 @@
       }
     }
 
-    // Handle appointment form submission
+    // Handle appointment form submission - FIXED CODE
     document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -453,9 +486,15 @@
       errorMsg.classList.add('d-none');
       
       const formData = new FormData(e.target);
+      const doctorId = formData.get('doctor');
+      
+      // Find the doctor object from doctorsData using the selected ID
+      const selectedDoctor = doctorsData.find(d => d.id == doctorId);
+      
+      // Create the appointment data using the doctor's full name instead of ID
       const appointmentData = {
         patient_id: parseInt(formData.get('patient_id')),
-        doctor: formData.get('doctor'),
+        doctor: selectedDoctor ? `${selectedDoctor.first_name} ${selectedDoctor.last_name}` : formData.get('doctor'),
         appointment_date: formData.get('appointment_date'),
         appointment_time: formData.get('appointment_time')
       };
@@ -527,14 +566,31 @@
       }
     });
 
+    // Fetch and display room assignments
+    async function fetchRoomAssignments() {
+      try {
+        const response = await fetch('http://localhost:8000/api/room-assignments');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.assignments || [];
+      } catch (error) {
+        console.error('Error fetching room assignments:', error);
+        throw error;
+      }
+    }
+
     // Refresh appointments button
     document.getElementById('refreshAppointmentsBtn').addEventListener('click', displayAppointments);
 
     // Initialize page: populate dropdowns and load appointments
     document.addEventListener('DOMContentLoaded', function() {
+      loadDoctors();
       populatePatientDropdowns();
       displayAppointments();
     });
+  
 // Fetch and display room assignments
 async function fetchRoomAssignments() {
   try {
