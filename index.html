@@ -71,11 +71,29 @@
     <div id="appointmentErrorMsg" class="mt-2 text-danger d-none">Error scheduling appointment.</div>
   </div>
 
-  <!-- View Scheduled Appointments -->
+  <!-- View Scheduled Appointments with Filters -->
   <div class="mb-4">
     <h5>Scheduled Appointments</h5>
+    
+    <!-- Filters for appointments -->
+    <div class="row mb-3">
+      <div class="col-md-4">
+        <select class="form-select" id="doctorFilter">
+          <option value="">All Doctors</option>
+          <!-- Will be populated dynamically -->
+        </select>
+      </div>
+      <div class="col-md-4">
+        <input type="date" class="form-control" id="dateFilter" placeholder="Filter by date">
+      </div>
+      <div class="col-md-4">
+        <button id="applyFiltersBtn" class="btn btn-primary me-2">Apply Filters</button>
+        <button id="clearFiltersBtn" class="btn btn-outline-secondary">Clear Filters</button>
+      </div>
+    </div>
+    
     <button id="refreshAppointmentsBtn" class="btn btn-outline-primary">Refresh Appointments</button>
-    <table class="table table-bordered">
+    <table class="table table-bordered mt-2">
       <thead>
         <tr>
           <th>ID</th>
@@ -107,6 +125,7 @@
     </ul>
   </div>
 </div>
+
 <!-- In-Patient Management -->
 <div class="tab-pane fade" id="inpatient">
   <h3>In-Patient Management</h3>
@@ -176,6 +195,7 @@
     </div>
   </div>
 </div>
+
   <!-- Staff Management -->
 <div class="tab-pane fade" id="staff">
   <h3>Clinic Staff Management</h3>
@@ -311,6 +331,8 @@
     let patientsData = [];
     // Global variable to store doctors
     let doctorsData = [];
+    // Global variable to store all appointments
+    let allAppointments = [];
 
     // Format time from seconds or HH:MM:SS to readable format
     function formatTime(timeString) {
@@ -338,13 +360,34 @@
     }
 
     // Format date from YYYY-MM-DD to DD/MM/YYYY for display
-    function formatDate(dateString) {
+    function formatDateForDisplay(dateString) {
       if (!dateString) return '';
       
       const date = new Date(dateString);
       if (isNaN(date.getTime())) return dateString; // Return as is if invalid
       
       return date.toLocaleDateString('en-GB'); // Format as DD/MM/YYYY
+    }
+
+    // Format date to YYYY-MM-DD for API consistency
+    function formatDateForAPI(dateString) {
+      if (!dateString) return '';
+      
+      // If already in YYYY-MM-DD format
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+        return dateString;
+      }
+      
+      // Try to parse other formats
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return dateString; // Return as is if invalid
+      
+      // Format as YYYY-MM-DD
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      
+      return `${year}-${month}-${day}`;
     }
 
     // Get patient name by ID
@@ -410,12 +453,44 @@
         const doctorSelect = document.getElementById('doctorSelect');
         doctorSelect.innerHTML = '<option value="">Select Doctor</option>';
         
+        // Populate the doctors dropdown for appointment scheduling
         data.doctors.forEach(doctor => {
           const option = document.createElement('option');
           option.value = doctor.id;
           option.textContent = `${doctor.first_name} ${doctor.last_name} (${doctor.role})`;
           doctorSelect.appendChild(option);
         });
+        
+        // Populate the doctor filter dropdown
+        const doctorFilter = document.getElementById('doctorFilter');
+        doctorFilter.innerHTML = '<option value="">All Doctors</option>';
+        
+        // Create a set of unique doctor names from appointments
+        const uniqueDoctors = new Set();
+        
+        // First add doctors from the doctors API
+        data.doctors.forEach(doctor => {
+          const doctorName = `${doctor.first_name} ${doctor.last_name}`;
+          uniqueDoctors.add(doctorName);
+        });
+        
+        // Then add any other doctors found in appointments
+        if (allAppointments.length > 0) {
+          allAppointments.forEach(appointment => {
+            if (appointment.doctor) {
+              uniqueDoctors.add(appointment.doctor);
+            }
+          });
+        }
+        
+        // Add each unique doctor to the filter dropdown
+        uniqueDoctors.forEach(doctorName => {
+          const option = document.createElement('option');
+          option.value = doctorName;
+          option.textContent = doctorName;
+          doctorFilter.appendChild(option);
+        });
+        
       } catch (error) {
         console.error('Error loading doctors:', error);
         // Fallback to text input if doctor fetch fails
@@ -433,31 +508,59 @@
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        return data.appointments;
+        // Normalize dates to YYYY-MM-DD format
+        allAppointments = data.appointments.map(appointment => ({
+          ...appointment,
+          appointment_date: formatDateForAPI(appointment.appointment_date)
+        }));
+        return allAppointments;
       } catch (error) {
         console.error('Error fetching appointments:', error);
         throw error;
       }
     }
 
-    // Display appointments in table
-    async function displayAppointments() {
+    // Filter appointments by doctor and date
+    function filterAppointments(appointments, doctorFilter, dateFilter) {
+      return appointments.filter(appointment => {
+        const matchesDoctor = !doctorFilter || appointment.doctor === doctorFilter;
+        
+        // If no date filter, just match the doctor filter
+        if (!dateFilter) return matchesDoctor;
+        
+        // Normalize both dates to YYYY-MM-DD format for comparison
+        const appointmentDate = formatDateForAPI(appointment.appointment_date);
+        const filterDate = formatDateForAPI(dateFilter);
+        
+        // Direct string comparison since both are now in YYYY-MM-DD format
+        return matchesDoctor && (appointmentDate === filterDate);
+      });
+    }
+
+    // Display appointments in table with optional filters
+    async function displayAppointments(doctorFilter = '', dateFilter = '') {
       const tableBody = document.getElementById('appointmentTableBody');
       tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading...</td></tr>';
       
       try {
-        const appointments = await fetchAppointments();
+        // Fetch all appointments if we don't have them yet
+        if (allAppointments.length === 0) {
+          allAppointments = await fetchAppointments();
+        }
         
-        if (appointments.length === 0) {
-          tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No appointments scheduled</td></tr>';
+        // Apply filters
+        const filteredAppointments = filterAppointments(allAppointments, doctorFilter, dateFilter);
+        
+        if (filteredAppointments.length === 0) {
+          tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No appointments found matching the filters</td></tr>';
           return;
         }
         
         tableBody.innerHTML = '';
-        appointments.forEach(appointment => {
+        filteredAppointments.forEach(appointment => {
           const patientName = getPatientNameById(appointment.patient_id);
           const formattedTime = formatTime(appointment.appointment_time);
-          const formattedDate = formatDate(appointment.appointment_date);
+          const formattedDate = formatDateForDisplay(appointment.appointment_date);
           
           const row = `
             <tr>
@@ -475,7 +578,7 @@
       }
     }
 
-    // Handle appointment form submission - FIXED CODE
+    // Handle appointment form submission
     document.getElementById('appointmentForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       
@@ -495,7 +598,7 @@
       const appointmentData = {
         patient_id: parseInt(formData.get('patient_id')),
         doctor: selectedDoctor ? `${selectedDoctor.first_name} ${selectedDoctor.last_name}` : formData.get('doctor'),
-        appointment_date: formData.get('appointment_date'),
+        appointment_date: formatDateForAPI(formData.get('appointment_date')),
         appointment_time: formData.get('appointment_time')
       };
       
@@ -514,12 +617,28 @@
         successMsg.classList.remove('d-none');
         e.target.reset();
         
-        // Refresh the appointments table
-        await displayAppointments();
+        // Refresh the appointments and filters
+        await fetchAppointments(); // Update the global allAppointments array
+        await loadDoctors(); // Refresh doctor filters with any new doctors
+        await displayAppointments(); // Display updated appointments
       } catch (error) {
         errorMsg.classList.remove('d-none');
         errorMsg.textContent = `Error: ${error.message}. Is the server running?`;
       }
+    });
+
+    // Handle applying appointment filters
+    document.getElementById('applyFiltersBtn').addEventListener('click', function() {
+      const doctorFilter = document.getElementById('doctorFilter').value;
+      const dateFilter = document.getElementById('dateFilter').value;
+      displayAppointments(doctorFilter, dateFilter);
+    });
+
+    // Handle clearing appointment filters
+    document.getElementById('clearFiltersBtn').addEventListener('click', function() {
+      document.getElementById('doctorFilter').value = '';
+      document.getElementById('dateFilter').value = '';
+      displayAppointments();
     });
 
     // Handle diagnosis lookup form submission
@@ -551,7 +670,7 @@
         
         diagnosisList.innerHTML = '';
         diagnoses.forEach(diagnosis => {
-          const formattedDate = formatDate(diagnosis.diagnosis_date);
+          const formattedDate = formatDateForDisplay(diagnosis.diagnosis_date);
           const item = `
             <li class="list-group-item">
               <strong>Date:</strong> ${formattedDate} 
@@ -582,15 +701,57 @@
     }
 
     // Refresh appointments button
-    document.getElementById('refreshAppointmentsBtn').addEventListener('click', displayAppointments);
+    document.getElementById('refreshAppointmentsBtn').addEventListener('click', async function() {
+      allAppointments = []; // Clear cached appointments
+      await fetchAppointments(); // Refresh appointment data
+      // Reset filters
+      document.getElementById('doctorFilter').value = '';
+      document.getElementById('dateFilter').value = '';
+      displayAppointments(); // Display all appointments
+    });
 
     // Initialize page: populate dropdowns and load appointments
-    document.addEventListener('DOMContentLoaded', function() {
-      loadDoctors();
-      populatePatientDropdowns();
-      displayAppointments();
+    document.addEventListener('DOMContentLoaded', async function() {
+      await fetchAppointments(); // First fetch all appointments
+      await loadDoctors(); // Then load doctors (also populates doctor filter)
+      await populatePatientDropdowns();
+      await displayAppointments(); // Display appointments with no filters
     });
-  
+
+    // Fetch and display room assignments
+    async function fetchRoomAssignments() {
+      try {
+        const response = await fetch('http://localhost:8000/api/room-assignments');
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+        return data.assignments || [];
+      } catch (error) {
+        console.error('Error fetching room assignments:', error);
+        throw error;
+      }
+    }
+
+    // Refresh appointments button
+    document.getElementById('refreshAppointmentsBtn').addEventListener('click', async function() {
+      allAppointments = []; // Clear cached appointments
+      await fetchAppointments(); // Refresh appointment data
+      // Reset filters
+      document.getElementById('doctorFilter').value = '';
+      document.getElementById('dateFilter').value = '';
+      displayAppointments(); // Display all appointments
+    });
+
+    // Initialize page: populate dropdowns and load appointments
+    document.addEventListener('DOMContentLoaded', async function() {
+      await fetchAppointments(); // First fetch all appointments
+      await loadDoctors(); // Then load doctors (also populates doctor filter)
+      await populatePatientDropdowns();
+      await displayAppointments(); // Display appointments with no filters
+    });
+ 
+ //In-patient Managment page 
 // Fetch and display room assignments
 async function fetchRoomAssignments() {
   try {
