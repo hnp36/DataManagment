@@ -6,6 +6,8 @@ import mysql.connector
 from mysql.connector import Error
 import logging
 from contextlib import contextmanager
+from datetime import datetime
+from typing import List
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -243,6 +245,18 @@ class NurseAssignment(BaseModel):
     shift: str
     responsibilities: str
 
+class Surgery(BaseModel):
+    patient_id: int
+    surgeon_id: int
+    surgery_type: str
+    room_number: str
+    surgery_date: str
+    start_time: str
+    end_time: str
+    notes: Optional[str] = None
+
+class SurgeryUpdate(BaseModel):
+    status: str
 # Startup event
 @app.on_event("startup")
 async def startup_event():
@@ -697,3 +711,198 @@ async def get_doctors():
             except Error as e:
                 logger.error(f"Error fetching doctors: {e}")
                 raise HTTPException(status_code=500, detail="Failed to fetch doctors")
+            
+@app.post("/api/surgeries", status_code=201)
+async def create_surgery(surgery: Surgery):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Verify patient exists
+                cursor.execute("SELECT name FROM patients WHERE id = %s", (surgery.patient_id,))
+                patient = cursor.fetchone()
+                if not patient:
+                    raise HTTPException(status_code=404, detail="Patient not found")
+                
+                # Verify surgeon exists
+                cursor.execute("SELECT first_name, last_name FROM staff WHERE id = %s AND role IN ('Surgeon', 'Physician')", 
+                              (surgery.surgeon_id,))
+                surgeon = cursor.fetchone()
+                if not surgeon:
+                    raise HTTPException(status_code=404, detail="Surgeon not found or not a valid surgeon")
+                
+                # Insert the surgery
+                cursor.execute("""
+                    INSERT INTO surgeries (
+                        patient_id, surgeon_id, surgery_type, room_number,
+                        surgery_date, start_time, end_time, notes, status
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'Scheduled')
+                """, (
+                    surgery.patient_id, surgery.surgeon_id, surgery.surgery_type,
+                    surgery.room_number, surgery.surgery_date, surgery.start_time,
+                    surgery.end_time, surgery.notes
+                ))
+                
+                # Get the inserted surgery ID
+                surgery_id = cursor.lastrowid
+                
+                # Create a complete surgery record to return
+                surgery_record = {
+                    "id": surgery_id,
+                    "patient_id": surgery.patient_id,
+                    "patient_name": patient['name'],
+                    "surgeon_id": surgery.surgeon_id,
+                    "surgeon_name": f"{surgeon['first_name']} {surgeon['last_name']}",
+                    "surgery_type": surgery.surgery_type,
+                    "room_number": surgery.room_number,
+                    "surgery_date": surgery.surgery_date,
+                    "start_time": surgery.start_time,
+                    "end_time": surgery.end_time,
+                    "notes": surgery.notes,
+                    "status": "Scheduled"
+                }
+                
+                connection.commit()
+                return {"message": "Surgery scheduled successfully", "surgery": surgery_record}
+                
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error scheduling surgery: {e}")
+                raise HTTPException(status_code=500, detail="Failed to schedule surgery")
+
+@app.get("/api/surgeries")
+async def get_surgeries(
+    patient_id: Optional[int] = None,
+    surgeon_id: Optional[int] = None,
+    room_number: Optional[str] = None,
+    date: Optional[str] = None,
+    status: Optional[str] = None
+):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                base_query = """
+                    SELECT 
+                        s.id, s.patient_id, p.name AS patient_name,
+                        s.surgeon_id, CONCAT(st.first_name, ' ', st.last_name) AS surgeon_name,
+                        s.surgery_type, s.room_number, 
+                        DATE_FORMAT(s.surgery_date, '%%Y-%%m-%%d') AS surgery_date,
+                        TIME_FORMAT(s.start_time, '%%H:%%i') AS start_time,
+                        TIME_FORMAT(s.end_time, '%%H:%%i') AS end_time,
+                        s.notes, s.status,
+                        CONCAT(TIME_FORMAT(s.start_time, '%%H:%%i'), ' - ', TIME_FORMAT(s.end_time, '%%H:%%i')) AS time_range
+                    FROM surgeries s
+                    JOIN patients p ON s.patient_id = p.id
+                    JOIN staff st ON s.surgeon_id = st.id
+                """
+                
+                conditions = []
+                params = []
+                
+                if patient_id:
+                    conditions.append("s.patient_id = %s")
+                    params.append(patient_id)
+                if surgeon_id:
+                    conditions.append("s.surgeon_id = %s")
+                    params.append(surgeon_id)
+                if room_number:
+                    conditions.append("s.room_number = %s")
+                    params.append(room_number)
+                if date:
+                    conditions.append("s.surgery_date = %s")
+                    params.append(date)
+                if status:
+                    conditions.append("s.status = %s")
+                    params.append(status)
+                
+                if conditions:
+                    base_query += " WHERE " + " AND ".join(conditions)
+                
+                base_query += " ORDER BY s.surgery_date, s.start_time"
+                
+                cursor.execute(base_query, params)
+                surgeries = cursor.fetchall()
+                
+                return {"surgeries": surgeries}
+                
+            except Error as e:
+                logger.error(f"Error fetching surgeries: {e}")
+                raise HTTPException(status_code=500, detail="Failed to fetch surgeries")
+
+@app.patch("/api/surgeries/{surgery_id}")
+async def update_surgery_status(surgery_id: int, update: SurgeryUpdate):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Verify surgery exists
+                cursor.execute("SELECT id FROM surgeries WHERE id = %s", (surgery_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Surgery not found")
+                
+                # Update status
+                cursor.execute("""
+                    UPDATE surgeries SET status = %s WHERE id = %s
+                """, (update.status, surgery_id))
+                
+                connection.commit()
+                return {"message": "Surgery status updated successfully"}
+                
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error updating surgery status: {e}")
+                raise HTTPException(status_code=500, detail="Failed to update surgery status")
+
+@app.delete("/api/surgeries/{surgery_id}")
+async def cancel_surgery(surgery_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Verify surgery exists
+                cursor.execute("SELECT id FROM surgeries WHERE id = %s", (surgery_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Surgery not found")
+                
+                # Update status to Cancelled rather than deleting
+                cursor.execute("""
+                    UPDATE surgeries SET status = 'Cancelled' WHERE id = %s
+                """, (surgery_id,))
+                
+                connection.commit()
+                return {"message": "Surgery cancelled successfully"}
+                
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error cancelling surgery: {e}")
+                raise HTTPException(status_code=500, detail="Failed to cancel surgery")
+
+# Add this to your create_tables() function
+def create_tables():
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # ... (your existing table creation code)
+
+                # Surgeries Table
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS surgeries (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        patient_id INT NOT NULL,
+                        surgeon_id INT NOT NULL,
+                        surgery_type VARCHAR(100) NOT NULL,
+                        room_number VARCHAR(20) NOT NULL,
+                        surgery_date DATE NOT NULL,
+                        start_time TIME NOT NULL,
+                        end_time TIME NOT NULL,
+                        notes TEXT,
+                        status VARCHAR(20) NOT NULL DEFAULT 'Scheduled',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        FOREIGN KEY (patient_id) REFERENCES patients(id),
+                        FOREIGN KEY (surgeon_id) REFERENCES staff(id)
+                    )
+                ''')
+
+                connection.commit()
+                logger.info("Tables created successfully")
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error creating tables: {e}")
+                raise HTTPException(status_code=500, detail="Table creation failed")
