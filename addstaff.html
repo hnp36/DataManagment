@@ -86,7 +86,7 @@
     </div>
 
     <!-- View Staff Section -->
-    <div class="mt-5">
+  <div class="mt-5">
       <h4>Staff Records</h4>
       <button id="viewStaffBtn" class="btn btn-outline-primary">View Staff</button>
       <div id="staffList" style="display:none;">
@@ -101,6 +101,7 @@
               <th>Phone</th>
               <th>Employment Type</th>
               <th>Role</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="staffTableBody">
@@ -161,20 +162,22 @@
       }
     });
 
-    document.getElementById("viewStaffBtn").addEventListener("click", async function () {
+document.getElementById("viewStaffBtn").addEventListener("click", async function () {
       const tableBody = document.getElementById("staffTableBody");
       const staffListDiv = document.getElementById("staffList");
 
-      tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>Loading...</td></tr>";
+      tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>Loading...</td></tr>";
       staffListDiv.style.display = "block";
 
       try {
         const response = await fetch("http://localhost:8000/api/staff");
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
         const data = await response.json();
         const staffMembers = data.staff;
 
         if (staffMembers.length === 0) {
-          tableBody.innerHTML = "<tr><td colspan='8' class='text-center'>No staff members found</td></tr>";
+          tableBody.innerHTML = "<tr><td colspan='9' class='text-center'>No staff members found</td></tr>";
           return;
         }
 
@@ -190,15 +193,60 @@
               <td>${staff.phone}</td>
               <td>${staff.emp_type}</td>
               <td>${staff.role}</td>
+              <td>
+                <button class="btn btn-sm btn-danger delete-btn" data-id="${staff.id}">Delete</button>
+              </td>
             </tr>`;
           tableBody.innerHTML += row;
         });
+
+        // Add event listeners to all delete buttons
+        document.querySelectorAll('.delete-btn').forEach(button => {
+          button.addEventListener('click', handleDeleteStaff);
+        });
       } catch (error) {
         console.error("Error loading staff:", error);
-        tableBody.innerHTML = `<tr><td colspan="8" class="text-danger text-center">Failed to load staff.</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="9" class="text-danger text-center">Failed to load staff: ${error.message}</td></tr>`;
       }
     });
 
+    async function handleDeleteStaff(event) {
+      const staffId = event.target.getAttribute('data-id');
+      const loadingIndicator = document.getElementById("loadingIndicator");
+      const errorMsg = document.getElementById("staffErrorMsg");
+      const successMsg = document.getElementById("staffSuccessMsg");
+
+      if (!confirm(`Are you sure you want to delete staff member with ID ${staffId}?`)) {
+        return;
+      }
+
+      loadingIndicator.classList.remove("d-none");
+      errorMsg.classList.add("d-none");
+      successMsg.classList.add("d-none");
+
+      try {
+        const response = await fetch(`http://localhost:8000/api/staff/${staffId}`, {
+          method: 'DELETE',
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.detail || `HTTP error! status: ${response.status}`);
+        }
+
+        loadingIndicator.classList.add("d-none");
+        successMsg.textContent = "Staff member deleted successfully!";
+        successMsg.classList.remove("d-none");
+        
+        // Refresh the staff list
+        document.getElementById("viewStaffBtn").click();
+      } catch (error) {
+        loadingIndicator.classList.add("d-none");
+        errorMsg.textContent = `Error: ${error.message}`;
+        errorMsg.classList.remove("d-none");
+        console.error("Error deleting staff:", error);
+      }
+    }
     // Dynamic Role selection based on Emp_Type
     const empTypeSelect = document.getElementById("empTypeSelect");
     const roleField = document.getElementById("roleField");

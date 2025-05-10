@@ -477,13 +477,52 @@ async def delete_staff(staff_id: int):
                 if not cursor.fetchone():
                     raise HTTPException(status_code=404, detail="Staff member not found")
                 
+                # Check for dependent records in shifts table
+                cursor.execute("SELECT id FROM shifts WHERE staff_id = %s LIMIT 1", (staff_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete staff with assigned shifts. Delete shifts first."
+                    )
+                
+                # Check for dependent records in doctor_assignments table
+                cursor.execute("SELECT id FROM doctor_assignments WHERE doctor_id = %s LIMIT 1", (staff_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete staff with doctor assignments. Delete assignments first."
+                    )
+                
+                # Check for dependent records in nurse_assignments table
+                cursor.execute("SELECT id FROM nurse_assignments WHERE nurse_id = %s LIMIT 1", (staff_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete staff with nurse assignments. Delete assignments first."
+                    )
+                
+                # Check for dependent records in surgeries table
+                cursor.execute("SELECT id FROM surgeries WHERE surgeon_id = %s LIMIT 1", (staff_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete staff with scheduled surgeries. Cancel surgeries first."
+                    )
+                
+                # Check for dependent records in room_assignments table
+                cursor.execute("SELECT id FROM room_assignments WHERE assigned_nurse = (SELECT CONCAT(first_name, ' ', last_name) FROM staff WHERE id = %s) LIMIT 1", (staff_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete staff assigned to rooms. Reassign rooms first."
+                    )
+                
                 # Delete the staff member
                 cursor.execute("DELETE FROM staff WHERE id = %s", (staff_id,))
                 connection.commit()
                 
-                # Check if deletion was successful
                 if cursor.rowcount == 0:
-                    raise HTTPException(status_code=500, detail="Failed to delete staff member")
+                    raise HTTPException(status_code=404, detail="Staff member not found or already deleted")
                     
                 return {"message": "Staff member deleted successfully", "success": True}
             except Error as e:
