@@ -194,8 +194,29 @@
       Error scheduling procedure.
     </div>
   </div>
-</div>
 
+
+<div class="mb-3">
+  <h5>View Scheduled Surgeries</h5>
+  <button id="refreshSurgeriesBtn" class="btn btn-outline-primary mb-2">Refresh Surgeries</button>
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Patient</th>
+        <th>Doctor</th>
+        <th>Room</th>
+        <th>Date</th>
+        <th>Time</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody id="surgeriesTableBody">
+      <tr><td colspan="7" class="text-center">No surgeries scheduled</td></tr>
+    </tbody>
+  </table>
+</div>
+</div>
   <!-- Staff Management -->
 <div class="tab-pane fade" id="staff">
   <h3>Clinic Staff Management</h3>
@@ -846,6 +867,56 @@ async function populateProcedureStaffDropdown() {
     console.error('Error populating staff dropdown:', error);
   }
 }
+// Function to fetch all procedures from localStorage
+function getStoredProcedures() {
+  return JSON.parse(localStorage.getItem('procedures') || '[]');
+}
+
+// Function to display scheduled surgeries
+async function displayScheduledSurgeries() {
+  const tableBody = document.getElementById('surgeriesTableBody');
+  tableBody.innerHTML = '<tr><td colspan="7" class="text-center">Loading surgeries...</td></tr>';
+  
+  try {
+    const procedures = getStoredProcedures();
+    const patients = await fetchPatients();
+    const staff = await fetchStaff();
+    
+    if (procedures.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="7" class="text-center">No surgeries scheduled</td></tr>';
+      return;
+    }
+    
+    tableBody.innerHTML = '';
+    procedures.forEach(procedure => {
+      const patient = patients.find(p => p.id === procedure.patient_id);
+      const doctor = staff.find(s => s.id === procedure.staff_id);
+      
+      const patientName = patient ? patient.name : `Patient ID: ${procedure.patient_id}`;
+      const doctorName = doctor ? `${doctor.first_name} ${doctor.last_name}` : `Staff ID: ${procedure.staff_id}`;
+      const formattedDate = formatDateForDisplay(procedure.procedure_date);
+      
+      const row = `
+        <tr>
+          <td>${procedure.id}</td>
+          <td>${patientName}</td>
+          <td>${doctorName}</td>
+          <td>${procedure.room_number}</td>
+          <td>${formattedDate}</td>
+          <td>${procedure.procedure_time}</td>
+          <td>${procedure.status || 'scheduled'}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="7" class="text-center text-danger">Failed to load surgeries</td></tr>';
+    console.error('Error loading surgeries:', error);
+  }
+}
+
+// Add event listener for refresh button
+document.getElementById('refreshSurgeriesBtn')?.addEventListener('click', displayScheduledSurgeries);
 
 // Handle procedure scheduling form submission
 document.getElementById('scheduleProcedureForm').addEventListener('submit', async function(e) {
