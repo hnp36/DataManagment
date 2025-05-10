@@ -8,7 +8,7 @@ import logging
 from contextlib import contextmanager
 from datetime import datetime
 from typing import List
-
+from fastapi import HTTPException
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -299,7 +299,76 @@ async def get_patients():
                 return {"patients": cursor.fetchall()}
             except Error as e:
                 raise HTTPException(status_code=500, detail=str(e))
-
+@app.delete("/api/patients/{patient_id}")
+async def delete_patient(patient_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Check if patient exists and if they have related records
+                cursor.execute("SELECT id FROM patients WHERE id = %s", (patient_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Patient not found")
+                
+                # Check for related appointments
+                cursor.execute("SELECT id FROM appointments WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing appointments. Delete appointments first."
+                    )
+                
+                # Check for related diagnoses
+                cursor.execute("SELECT id FROM diagnoses WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing diagnoses. Delete diagnoses first."
+                    )
+                
+                # Check for related room assignments
+                cursor.execute("SELECT id FROM room_assignments WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing room assignments. Delete room assignments first."
+                    )
+                
+                # Check for related doctor assignments
+                cursor.execute("SELECT id FROM doctor_assignments WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing doctor assignments. Delete doctor assignments first."
+                    )
+                
+                # Check for related nurse assignments
+                cursor.execute("SELECT id FROM nurse_assignments WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing nurse assignments. Delete nurse assignments first."
+                    )
+                
+                # Check for related surgeries
+                cursor.execute("SELECT id FROM surgeries WHERE patient_id = %s LIMIT 1", (patient_id,))
+                if cursor.fetchone():
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="Cannot delete patient with existing surgeries. Delete surgeries first."
+                    )
+                
+                # Delete the patient
+                cursor.execute("DELETE FROM patients WHERE id = %s", (patient_id,))
+                connection.commit()
+                
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Patient not found or already deleted")
+                    
+                return {"message": "Patient deleted successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error deleting patient: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 # Appointment Routes
 @app.post("/api/appointments")
 async def schedule_appointment(appointment: Appointment):
