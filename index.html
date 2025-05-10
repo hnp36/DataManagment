@@ -862,29 +862,88 @@ document.getElementById('scheduleProcedureForm').addEventListener('submit', asyn
     patient_id: parseInt(formData.get('patient_id')),
     staff_id: parseInt(formData.get('staff_id')),
     room_number: formData.get('room_number'),
-    procedure_date: formData.get('procedure_date'),
+    procedure_date: formatDateForAPI(formData.get('procedure_date')),
     procedure_time: formData.get('procedure_time')
   };
   
   try {
-    // Since we don't have a procedures endpoint, we'll simulate the response
-    console.log('Procedure data to be sent:', procedureData);
+    // Mock implementation - replace with actual API call when backend is ready
+    console.log('Procedure data to be saved:', procedureData);
     
-    // Simulate success response
+    // Simulate API delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // Store in localStorage as a temporary solution
+    const procedures = JSON.parse(localStorage.getItem('procedures') || '[]');
+    procedures.push({
+      ...procedureData,
+      id: procedures.length + 1,
+      status: 'scheduled'
+    });
+    localStorage.setItem('procedures', JSON.stringify(procedures));
+    
     successMsg.classList.remove('d-none');
-    successMsg.textContent = 'Procedure scheduling simulated (endpoint not implemented)';
+    successMsg.textContent = 'Procedure scheduled successfully (stored locally)';
     e.target.reset();
     
-    // In a real implementation, you would:
-    // 1. Create a /api/procedures endpoint on your backend
-    // 2. Send the data to that endpoint
-    // 3. Handle the response appropriately
+    // Refresh room assignments display
+    await displayRoomAssignments();
   } catch (error) {
     errorMsg.classList.remove('d-none');
     errorMsg.textContent = `Error: ${error.message}`;
     console.error('Error scheduling procedure:', error);
   }
 });
+
+// Update displayRoomAssignments to show both API and local procedures
+async function displayRoomAssignments() {
+  const tableBody = document.getElementById('roomAssignmentsTableBody');
+  tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>';
+  
+  try {
+    // Get API assignments
+    let apiAssignments = [];
+    try {
+      apiAssignments = await fetchRoomAssignments();
+    } catch (apiError) {
+      console.log('Could not fetch API assignments:', apiError.message);
+    }
+    
+    // Get local procedures
+    const localProcedures = JSON.parse(localStorage.getItem('procedures') || '[]');
+    
+    // Combine both sources
+    const allAssignments = [...apiAssignments, ...localProcedures];
+    
+    if (allAssignments.length === 0) {
+      tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No room assignments found</td></tr>';
+      return;
+    }
+    
+    // Get patients for name lookup
+    const patients = await fetchPatients();
+    
+    tableBody.innerHTML = '';
+    allAssignments.forEach(assignment => {
+      const patient = patients.find(p => p.id === assignment.patient_id);
+      const patientName = patient ? patient.name : `Patient ID: ${assignment.patient_id}`;
+      const formattedDate = formatDateForDisplay(assignment.procedure_date || assignment.assignment_date);
+      
+      const row = `
+        <tr>
+          <td>${assignment.id}</td>
+          <td>${patientName}</td>
+          <td>${assignment.room_number}</td>
+          <td>${formattedDate}</td>
+          <td>${assignment.status || 'scheduled'}</td>
+        </tr>
+      `;
+      tableBody.innerHTML += row;
+    });
+  } catch (error) {
+    tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load room assignments</td></tr>';
+  }
+}
 
 // Initialize in-patient management tab when it's shown
 document.querySelector('a[href="#inpatient"]').addEventListener('shown.bs.tab', function() {
