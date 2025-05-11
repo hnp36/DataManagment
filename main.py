@@ -299,6 +299,114 @@ async def get_patients():
                 return {"patients": cursor.fetchall()}
             except Error as e:
                 raise HTTPException(status_code=500, detail=str(e))
+            
+# Add these to your existing FastAPI code
+
+# Update Patient Route
+@app.put("/api/patients/{patient_id}")
+async def update_patient(patient_id: int, patient: Patient):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # First check if patient exists
+                cursor.execute("SELECT id FROM patients WHERE id = %s", (patient_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Patient not found")
+                
+                # Update patient information
+                cursor.execute("""
+                    UPDATE patients 
+                    SET name = %s, age = %s, gender = %s, phone = %s, email = %s, address = %s
+                    WHERE id = %s
+                """, (
+                    patient.name, patient.age, patient.gender, 
+                    patient.phone, patient.email, patient.address, 
+                    patient_id
+                ))
+                connection.commit()
+                
+                # Check if update was successful
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=500, detail="Failed to update patient")
+                    
+                return {"message": "Patient updated successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error updating patient: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+                
+# Delete Patient Route
+@app.delete("/api/patients/{patient_id}")
+async def delete_patient(patient_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                # Check for related records in other tables
+                related_tables = []
+                
+                # Check appointments
+                cursor.execute("SELECT COUNT(*) as count FROM appointments WHERE patient_id = %s", (patient_id,))
+                if cursor.fetchone()['count'] > 0:
+                    related_tables.append("appointments")
+                
+                # Check diagnoses
+                cursor.execute("SELECT COUNT(*) as count FROM diagnoses WHERE patient_id = %s", (patient_id,))
+                if cursor.fetchone()['count'] > 0:
+                    related_tables.append("diagnoses")
+                    
+                # Check room_assignments
+                cursor.execute("SELECT COUNT(*) as count FROM room_assignments WHERE patient_id = %s", (patient_id,))
+                if cursor.fetchone()['count'] > 0:
+                    related_tables.append("room_assignments")
+                
+                # Check doctor_assignments
+                cursor.execute("SELECT COUNT(*) as count FROM doctor_assignments WHERE patient_id = %s", (patient_id,))
+                if cursor.fetchone()['count'] > 0:
+                    related_tables.append("doctor_assignments")
+                
+                # Check nurse_assignments
+                cursor.execute("SELECT COUNT(*) as count FROM nurse_assignments WHERE patient_id = %s", (patient_id,))
+                if cursor.fetchone()['count'] > 0:
+                    related_tables.append("nurse_assignments")
+                
+                # Check surgeries if the table exists
+                try:
+                    cursor.execute("SHOW TABLES LIKE 'surgeries'")
+                    if cursor.fetchone():
+                        cursor.execute("SELECT COUNT(*) as count FROM surgeries WHERE patient_id = %s", (patient_id,))
+                        if cursor.fetchone()['count'] > 0:
+                            related_tables.append("surgeries")
+                except:
+                    pass  # Table doesn't exist, continue
+                
+                # If there are related records, return an error
+                if related_tables:
+                    raise HTTPException(
+                        status_code=409,
+                        detail=f"Cannot delete patient because they have records in: {', '.join(related_tables)}. Delete those records first."
+                    )
+                
+                # First check if patient exists
+                cursor.execute("SELECT id FROM patients WHERE id = %s", (patient_id,))
+                if not cursor.fetchone():
+                    raise HTTPException(status_code=404, detail="Patient not found")
+                
+                # Delete the patient
+                cursor.execute("DELETE FROM patients WHERE id = %s", (patient_id,))
+                connection.commit()
+                
+                # Check if deletion was successful
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=500, detail="Failed to delete patient")
+                    
+                return {"message": "Patient deleted successfully", "success": True}
+            except HTTPException:
+                connection.rollback()
+                raise
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error deleting patient: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
 
 # Appointment Routes
 @app.post("/api/appointments")
@@ -397,6 +505,7 @@ async def get_staff():
                 return {"staff": cursor.fetchall()}
             except Error as e:
                 raise HTTPException(status_code=500, detail=str(e))
+            
 
 @app.delete("/api/staff/{staff_id}")
 async def delete_staff(staff_id: int):
@@ -420,6 +529,56 @@ async def delete_staff(staff_id: int):
             except Error as e:
                 connection.rollback()
                 logger.error(f"Error deleting staff: {e}")
+                raise HTTPException(status_code=500, detail=str(e))
+            
+@app.get("/api/staff/{staff_id}")
+async def get_staff_by_id(staff_id: int):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("SELECT * FROM staff WHERE id = %s", (staff_id,))
+                staff = cursor.fetchone()
+                if not staff:
+                    raise HTTPException(status_code=404, detail="Staff member not found")
+                return {"staff": staff}
+            except Error as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/api/staff/{staff_id}")
+async def update_staff(staff_id: int, updated_staff: Staff):
+    with get_db_connection() as connection:
+        with get_db_cursor(connection) as cursor:
+            try:
+                cursor.execute("""
+                    UPDATE staff SET
+                        first_name = %s,
+                        last_name = %s,
+                        age = %s,
+                        employment_no = %s,
+                        ssn = %s,
+                        street = %s,
+                        city = %s,
+                        state = %s,
+                        zip = %s,
+                        gender = %s,
+                        phone = %s,
+                        emp_type = %s,
+                        role = %s
+                    WHERE id = %s
+                """, (
+                    updated_staff.first_name, updated_staff.last_name, updated_staff.age,
+                    updated_staff.employment_no, updated_staff.ssn, updated_staff.street,
+                    updated_staff.city, updated_staff.state, updated_staff.zip,
+                    updated_staff.gender, updated_staff.phone, updated_staff.emp_type,
+                    updated_staff.role, staff_id
+                ))
+                connection.commit()
+                if cursor.rowcount == 0:
+                    raise HTTPException(status_code=404, detail="Staff member not found")
+                return {"message": "Staff member updated successfully", "success": True}
+            except Error as e:
+                connection.rollback()
+                logger.error(f"Error updating staff: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
 # Room Assignment Routes
@@ -454,30 +613,37 @@ async def get_room_assignments(patient_id: Optional[int] = None):
                         ra.id, ra.patient_id, ra.admission_date, 
                         ra.nursing_unit, ra.room_number, ra.bed_number,
                         ra.number_of_days, ra.assigned_nurse, ra.created_at,
-                        p.name as patient_name,
-                        DATE_FORMAT(ra.admission_date, '%%Y-%%m-%%d') as formatted_date
+                        p.name AS patient_name,
+                        DATE_FORMAT(ra.admission_date, '%Y-%m-%d') AS formatted_date
                     FROM room_assignments ra
                     JOIN patients p ON ra.patient_id = p.id
                 """
-                
-                query_parts = [base_query]
+
                 params = []
-                
+                where_clause = ""
                 if patient_id is not None:
-                    query_parts.append(" WHERE ra.patient_id = %s")
+                    where_clause = "WHERE ra.patient_id = %s"
                     params.append(patient_id)
-                
-                query_parts.append(" ORDER BY ra.admission_date DESC")
-                
-                final_query = "".join(query_parts)
+
+                final_query = f"""
+                    {base_query}
+                    {where_clause}
+                    ORDER BY ra.admission_date DESC
+                """
+
+                logger.info(f"Executing SQL: {final_query.strip()} | Params: {params}")
+
                 cursor.execute(final_query, params)
-                
                 assignments = cursor.fetchall()
+
+                if not assignments:
+                    logger.warning("No room assignments found.")
                 return {"assignments": assignments}
+
             except Error as e:
                 logger.error(f"Error fetching room assignments: {e}")
                 raise HTTPException(
-                    status_code=500, 
+                    status_code=500,
                     detail="Failed to fetch room assignments. Please try again later."
                 )
 # Utility Routes

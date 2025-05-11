@@ -770,22 +770,40 @@ async function fetchRoomAssignments() {
 async function displayRoomAssignments() {
   const tableBody = document.getElementById('roomAssignmentsTableBody');
   tableBody.innerHTML = '<tr><td colspan="5" class="text-center">Loading room assignments...</td></tr>';
-  
+
   try {
     const assignments = await fetchRoomAssignments();
     const patients = await fetchPatients();
-    
+
+    console.log("Assignments from backend:", assignments);
+
     if (assignments.length === 0) {
       tableBody.innerHTML = '<tr><td colspan="5" class="text-center">No room assignments found</td></tr>';
       return;
     }
-    
+
     tableBody.innerHTML = '';
     assignments.forEach(assignment => {
-      const patient = patients.find(p => p.id === assignment.patient_id);
-      const patientName = patient ? patient.name : `Patient ID: ${assignment.patient_id}`;
-      const formattedDate = formatDate(assignment.assignment_date);
+      // Use patient_name from backend or find patient from patients list
+      let patientName = assignment.patient_name;
       
+      if (!patientName) {
+        const patient = patients.find(p => p.id === assignment.patient_id);
+        patientName = patient
+          ? `${patient.first_name} ${patient.last_name}`
+          : `Patient ID: ${assignment.patient_id}`;
+      }
+
+      // Format date - handle both formatted_date from backend or use admission_date
+      let formattedDate;
+      if (assignment.formatted_date) {
+        formattedDate = assignment.formatted_date;
+      } else if (assignment.admission_date) {
+        formattedDate = formatDate(assignment.admission_date);
+      } else {
+        formattedDate = 'N/A';
+      }
+
       const row = `
         <tr>
           <td>${assignment.id}</td>
@@ -798,10 +816,10 @@ async function displayRoomAssignments() {
       tableBody.innerHTML += row;
     });
   } catch (error) {
+    console.error("Display error:", error);
     tableBody.innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load room assignments</td></tr>';
   }
 }
-
 // Populate patient dropdown for procedure scheduling
 async function populateProcedurePatientDropdown() {
   try {
