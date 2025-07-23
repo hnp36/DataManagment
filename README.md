@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Final Project Report:
 You can read the full project report [here](./CS631-Project.pdf).
 ## Process Flow Diagram 
@@ -30,3 +31,8 @@ A unified database system supports all three applications, ensuring:
 The architecture divides functionality into specialized interfaces for distinct user groups while maintaining seamless integration.
 
 This design meets the full application requirements of Newark Medical Associates, providing a scalable and maintainable solution for hospital management.
+=======
+FINAL Project
+
+LINK TO FINAL CODE:https://github.com/hnp36/DataManagment/tree/finalproject
+>>>>>>> e1e494deeab9325d5a010aeffb0b3b631d287faf
